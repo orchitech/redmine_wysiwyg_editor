@@ -319,21 +319,22 @@ suite('Redmine WYSIWYG Editor', function() {
 
     test('Preformatted', function() {
       var content = '<pre>#include &lt;stdio.h&gt;\n\nint main(int argc, char *argv[])\n{\n    printf("Hello, world\n");\n\n    return 0;\n}\n</pre>\n\n<pre>No newline at the end of the content</pre>';
-      var expected = '~~~\n#include <stdio.h>\n\nint main(int argc, char *argv[])\n{\n    printf("Hello, world\n");\n\n    return 0;\n}\n~~~\n\n~~~\nNo newline at the end of the content\n~~~';
+      var expected = '```\n#include <stdio.h>\n\nint main(int argc, char *argv[])\n{\n    printf("Hello, world\n");\n\n    return 0;\n}\n```\n\n```\nNo newline at the end of the content\n```';
 
       assert.equal(x._toTextMarkdown(content), expected);
     });
 
     test('Code block', function() {
       var content = '<pre data-code="c">#include &lt;stdio.h&gt;\n\nint main(int argc, char *argv[])\n{\n    printf("Hello, world\n");\n\n    return 0;\n}\n</pre>';
-      var expected = '~~~ c\n#include <stdio.h>\n\nint main(int argc, char *argv[])\n{\n    printf("Hello, world\n");\n\n    return 0;\n}\n~~~';
+      var expected = '~~~ c\n#include <stdio.h>\n\nint main(int argc, char *argv[])\n{\n    printf("Hello, world\n");\n\n    return 0;\n}\n```';
 
       assert.equal(x._toTextMarkdown(content), expected);
     });
 
+    // fails, because TD service takes code language from code element as its present and the only child 
     test('Code block (code sample plugin)', function() {
       var content = '<pre class="language-c" contenteditable="false"><code>#include &lt;stdio.h&gt;\n\nint main(int argc, char *argv[])\n{\n    printf("Hello, world\n");\n\n    return 0;\n}\n</code></pre>';
-      var expected = '~~~ c\n#include <stdio.h>\n\nint main(int argc, char *argv[])\n{\n    printf("Hello, world\n");\n\n    return 0;\n} \n~~~';
+      var expected = '``` c\n#include <stdio.h>\n\nint main(int argc, char *argv[])\n{\n    printf("Hello, world\n");\n\n    return 0;\n} \n```';
 
       assert.equal(x._toTextMarkdown(content), expected);
     });
@@ -470,6 +471,14 @@ suite('Redmine WYSIWYG Editor', function() {
       var content = '<img src="/attachments/download/1/foo.png" alt="Foo" width="5296" height="3972"><br><img src="/attachments/download/2/f%20o%20o.png" width="5296" height="3972"><br><img src="/attachments/download/3/%E3%83%95%E3%83%BC.png" width="5296" height="3972">';
 
       var expected = '<img src="/attachments/download/1/foo.png" alt="Foo" width="5296" height="3972">\n<img src="/attachments/download/2/f%20o%20o.png" width="5296" height="3972">\n<img src="/attachments/download/3/%E3%83%95%E3%83%BC.png" width="5296" height="3972">';
+
+      assert.equal(x._toTextMarkdown(content), expected);
+    });
+
+    test('html encoded macro', function() {
+      var content = '<code>{{</code><code>"hello_world(\_foo\_)"</code><code>}}</code>';
+
+      var expected = '{{hello_world(_foo_)}}'
 
       assert.equal(x._toTextMarkdown(content), expected);
     });

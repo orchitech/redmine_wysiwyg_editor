@@ -5,17 +5,21 @@
 
     module.exports = factory(require('jquery')(dom.window),
                              require('rwe-to-textile'),
-                             require('turndown'),
-                             require('rwe-turndown-plugin-gfm'),
+                             require('./turndown-service.umd'),
+                             {},
                              {});
   } else {
     var tt = (typeof toTextile !== 'undefined') ? toTextile : null;
     var td = (typeof TurndownService !== 'undefined') ? TurndownService : null;
-    var gfm = (typeof turndownPluginGfm !== 'undefined') ? turndownPluginGfm : null;
-
-    root.RedmineWysiwygEditor = factory($, tt, td, gfm, navigator);
+    root.RedmineWysiwygEditor = factory($, tt, td, null, navigator);
   }
 }(this, function($, toTextile, TurndownService, turndownPluginGfm, navigator) {
+
+var turndownService = new TurndownService();
+var escapers = turndownService.options.escapers;
+
+var MACRO_RE = /(!)?(\{\{([\w]+)(\(([^\n\r]*?)\))?(?:(?!\}\})[\n\r\S\s]*?[\n\r\S\s])?\}\})/gm;
+var MACRO_BODY_RE = /\{\{([\w]+(\([^\n\r]*?\))?[\S\s]*)\}\}/m;
 
 var RedmineWysiwygEditor = function(jstEditor, previewUrl) {
   this._jstEditor = jstEditor;
@@ -655,8 +659,33 @@ RedmineWysiwygEditor.prototype._setVisualContent = function() {
         .replace(/^fn(\d+)\.\s/mg, 'fn$$$1. ');
     };
 
+    var escapeMacroBody = function(data, macros) {
+      var replacedData = data;
+
+      macros.forEach(function(macro) {
+        var body = macro.match(MACRO_BODY_RE)[1];
+        var macroArgs = body.match(/\(([^\n\r]*?)\)((?:(?!\}\})[\s\S])*)/);
+        var macroBody = macroArgs ?
+          body.replace(macroArgs[1], escapers.escaper('text').escape(macroArgs[1])) : body;
+        macroBody = macroArgs[2]
+          ? macroBody.replace(macroArgs[2], escapers.escaper('text').escape(macroArgs[2]))
+          : macroBody;
+        // surround with code element to prevent rendering
+        var encodedMacro = macro.replace(body, `<code>${macroBody}</code>`); 
+        replacedData = replacedData.replace(macro, encodedMacro);
+      });
+
+      return replacedData;
+    };
+
     var escapeMarkdown = function(data) {
-      return data
+      var macros = data.match(MACRO_RE);
+      var escapedData = data;
+
+      if (macros.length > 0) {
+        escapedData = escapeMacroBody(data, macros);
+      }
+      return escapedData
         .replace(/^~~~ *(\w+)([\S\s]+?)~~~$/mg, '~~~\n$1+-*/!?$2~~~')
         .replace(/^``` *(\w+)([\S\s]+?)```$/mg, '~~~\n$1+-*/!?$2~~~');
     };
@@ -669,7 +698,6 @@ RedmineWysiwygEditor.prototype._setVisualContent = function() {
     var data = {};
     data[name] =
       escapeText(textarea[0].value.replace(/\$/g, '$$$$'))
-      .replace(/\{\{/g, '{$${')
       .replace(/document:/g, 'document$$:')
       .replace(/forum:/g, 'forum$$:')
       .replace(/message:/g, 'message$$:')
@@ -776,7 +804,25 @@ RedmineWysiwygEditor.prototype._gluableContent = function(content, node, glue) {
 RedmineWysiwygEditor.prototype._setTextContent = function() {
   var self = this;
 
-  var html = self._editor.getContent();
+  var html = self._editor.getContent(); // returns html without html encoded macro
+  var macros = html.match(MACRO_RE);
+  var encodeMacros = function(data, macros) {
+    var replacedData = data;
+    macros.forEach(function (macro) {
+      var body = macro.match(MACRO_BODY_RE)[1];
+      var foo = body.replace(/\<br ?\/?\>/gm, '\n'); // replace HTML breaks with newlines
+      var encodedMacro = macro
+        .replace(/\{\{/, '<code>{{</code>')
+        .replace(body, `<code>${JSON.stringify(foo)}</code>`)
+        .replace(/\}\}/, '<code>}}</code>');
+      replacedData = replacedData.replace(macro, encodedMacro);
+    });
+    return replacedData;
+  }
+
+  if (macros.length > 0) {
+    html = encodeMacros(html, macros); // returns html with html encoded macro
+  }
 
   var text = (self._format === 'textile') ?
       self._toTextTextile(html) :
@@ -1202,23 +1248,12 @@ RedmineWysiwygEditor.prototype._toTextMarkdown = function(content) {
   var self = this;
 
   if (!self._markdown) self._markdown = self._initMarkdown();
-
+  
   return self._markdown.turndown(content);
 };
 
 RedmineWysiwygEditor.prototype._initMarkdown = function() {
   var self = this;
-
-  var turndownService = new TurndownService({
-    headingStyle: 'atx'
-  });
-
-  // Overrides the method to disable escaping.
-  turndownService.escape = function(string) {
-    return string;
-  };
-
-  turndownService.use(turndownPluginGfm.tables);
 
   RedmineWysiwygEditor._resorceLinkRule.forEach(function(x) {
     turndownService.addRule(x.key, x);
@@ -1226,146 +1261,112 @@ RedmineWysiwygEditor.prototype._initMarkdown = function() {
 
   turndownService.addRule('wiki', self._wikiLinkRule());
 
-  turndownService.addRule('br', {
-    // Suppress appending two spaces at the end of the line.
-    filter: 'br',
-    replacement: function(content, node) {
-      return ($(node).closest('table').length > 0) ? ' ' : '\n';
-    }
-  }).addRule('div', {
-    filter: function(node) {
-      return (node.nodeName === 'DIV') && node.style.cssText.length;
-    },
-    replacement: function(content, node) {
-      return '<div style="' + node.style.cssText + '">\n' + content +
-        '\n</div>\n';
-    }
-  }).addRule('p', {
-    filter: function(node) {
-      return (node.nodeName === 'P') && node.style.cssText.length;
-    },
-    replacement: function(content, node) {
-      return '<p style="' + node.style.cssText + '">' + content + '</p>\n';
-    }
-  }).addRule('span', {
-    filter: function(node) {
-      return (node.nodeName === 'SPAN') && node.style.cssText.length;
-    },
-    replacement: function(content, node) {
-      return '<span style="' + node.style.cssText + '">' + content + '</span>';
-    }
-  }).addRule('bold', {
-    filter: 'mark',
-    replacement: function(content) {
-      return '**' + content + '**';
-    }
-  }).addRule('italic', {
-    filter: 'q',
-    replacement: function(content) {
-      return '_' + content + '_';
-    }
-  }).addRule('underline', {
-    filter: function(node) {
-      var name = node.nodeName;
+  // turndownService.addRule('br', {
+  //   // Suppress appending two spaces at the end of the line.
+  //   filter: 'br',
+  //   replacement: function(content, node) {
+  //     return ($(node).closest('table').length > 0) ? ' ' : '\n';
+  //   }
+  // }).addRule('div', {
+  //   filter: function(node) {
+  //     return (node.nodeName === 'DIV') && node.style.cssText.length;
+  //   },
+  //   replacement: function(content, node) {
+  //     return '<div style="' + node.style.cssText + '">\n' + content +
+  //       '\n</div>\n';
+  //   }
+  // }).addRule('p', {
+  //   filter: function(node) {
+  //     return (node.nodeName === 'P') && node.style.cssText.length;
+  //   },
+  //   replacement: function(content, node) {
+  //     return '<p style="' + node.style.cssText + '">' + content + '</p>\n';
+  //   }
+  // }).addRule('span', {
+  //   filter: function(node) {
+  //     return (node.nodeName === 'SPAN') && node.style.cssText.length;
+  //   },
+  //   replacement: function(content, node) {
+  //     return '<span style="' + node.style.cssText + '">' + content + '</span>';
+  //   }
 
-      return (name === 'U') || (name === 'INS') ||
-        ((name === 'SPAN') && (node.style.textDecoration === 'underline'));
-    },
-    replacement: function(content) {
-      return '<ins>' + content + '</ins>';
-    }
-  }).addRule('strikethrough', {
-    filter: function(node) {
-      var name = node.nodeName;
+  // }).addRule('code', {
+  //   filter: ['kbd', 'samp', 'tt', 'var'],
+  //   replacement: function(content) {
+  //     return '`' + content + '`';
+  //   }
+  // }).addRule('a', {
+  //   filter: function(node) {
+  //     var content = node.textContent;
+  //     var href = node.getAttribute('href');
 
-      return (name === 'S') || (name === 'DEL') ||
-        ((name === 'SPAN') && (node.style.textDecoration === 'line-through'));
-    },
-    replacement: function(content) {
-      return '~~' + content + '~~';
-    }
-  }).addRule('del', {
-    filter: 'del',
-    replacement: function(content) {
-      return '~~' + content + '~~';
-    }
-  }).addRule('code', {
-    filter: ['kbd', 'samp', 'tt', 'var'],
-    replacement: function(content) {
-      return '`' + content + '`';
-    }
-  }).addRule('a', {
-    filter: function(node) {
-      var content = node.textContent;
-      var href = node.getAttribute('href');
+  //     return (node.nodeName === 'A') && href &&
+  //       ((href === 'mailto:' + content) ||
+  //        (/^(http|https|ftp|ftps):/.test(href) &&
+  //         ((href === content) || (href === content + '/'))));
+  //   },
+  //   replacement: function(content, node) {
+  //     return self._gluableContent(content, node, ' ');
+  //   }
+  // }).addRule('table', {
+  //   filter: 'table',
+  //   replacement: function(content) {
+  //     return content;
+  //   }
+  // }).addRule('pTable', {
+  //   // Paragraph in table
+  //   filter: function(node) {
+  //     return (node.nodeName === 'P') && ($(node).closest('table').length > 0);
+  //   },
+  //   replacement: function(content) {
+  //     return content;
+  //   }
+  // }).addRule('pre', {
+  //   filter: 'pre',
+  //   replacement: function(content, node) {
+  //     var code = node.dataset.code;
+  //     var lang = node.className.match(/language-(\S+)/);
 
-      return (node.nodeName === 'A') && href &&
-        ((href === 'mailto:' + content) ||
-         (/^(http|https|ftp|ftps):/.test(href) &&
-          ((href === content) || (href === content + '/'))));
-    },
-    replacement: function(content, node) {
-      return self._gluableContent(content, node, ' ');
-    }
-  }).addRule('table', {
-    filter: 'table',
-    replacement: function(content) {
-      return content;
-    }
-  }).addRule('pTable', {
-    // Paragraph in table
-    filter: function(node) {
-      return (node.nodeName === 'P') && ($(node).closest('table').length > 0);
-    },
-    replacement: function(content) {
-      return content;
-    }
-  }).addRule('pre', {
-    filter: 'pre',
-    replacement: function(content, node) {
-      var code = node.dataset.code;
-      var lang = node.className.match(/language-(\S+)/);
+  //     var klass = code ? code :
+  //         lang ? self._languageClassName(lang[1]) : null;
 
-      var klass = code ? code :
-          lang ? self._languageClassName(lang[1]) : null;
+  //     var opt = klass ? ' ' + klass : '';
 
-      var opt = klass ? ' ' + klass : '';
-
-      return '~~~' + opt + '\n' + content.replace(/\n?$/, '\n') + '~~~\n\n';
-    }
-  }).addRule('blockquote', {
-    filter: 'blockquote',
-    replacement: function(content) {
-      return content.trim().replace(/\n\n\n+/g, '\n\n').replace(/^/mg, '> ');
-    }
-  }).addRule('img', {
-    filter: 'img',
-    replacement: function(content, node) {
-      return (self._htmlTagAllowed && (node.getAttribute('width') ||
-                                       node.getAttribute('height'))) ?
-        node.outerHTML :
-        '![' + node.alt + '](' + self._imageUrl(node.src) + ')';
-    }
-  }).addRule('block', {
-    filter: [
-      'address', 'article', 'aside', 'footer', 'header', 'nav',
-      'section', 'dl', 'dt', 'figcaption', 'figure', 'label', 'legend',
-      'option', 'progress', 'textarea', 'dialog', 'summary', 'center'
-    ],
-    replacement: function(content) {
-      return content + '\n\n';
-    }
-  }).addRule('content', {
-    filter: [
-      'hgroup', 'dd', 'main', 'bdi', 'bdo', 'cite', 'data', 'dfn',
-      'ruby', 'small', 'time', 'audio', 'track', 'video', 'picture', 'caption',
-      'button', 'datalist', 'fieldset', 'form', 'meter', 'optgroup', 'select',
-      'details', 'big', 'abbr'
-    ],
-    replacement: function(content) {
-      return content;
-    }
-  }).addRule('none', {
+  //     return '~~~' + opt + '\n' + content.replace(/\n?$/, '\n') + '~~~\n\n';
+  //   }
+  // }).addRule('blockquote', {
+  //   filter: 'blockquote',
+  //   replacement: function(content) {
+  //     return content.trim().replace(/\n\n\n+/g, '\n\n').replace(/^/mg, '> ');
+  //   }
+  // }).addRule('img', {
+  //   filter: 'img',
+  //   replacement: function(content, node) {
+  //     return (self._htmlTagAllowed && (node.getAttribute('width') ||
+  //                                      node.getAttribute('height'))) ?
+  //       node.outerHTML :
+  //       '![' + node.alt + '](' + self._imageUrl(node.src) + ')';
+  //   }
+  // }).addRule('block', {
+  //   filter: [
+  //     'address', 'article', 'aside', 'footer', 'header', 'nav',
+  //     'section', 'dl', 'dt', 'figcaption', 'figure', 'label', 'legend',
+  //     'option', 'progress', 'textarea', 'dialog', 'summary', 'center'
+  //   ],
+  //   replacement: function(content) {
+  //     return content + '\n\n';
+  //   }
+  // }).addRule('content', {
+  //   filter: [
+  //     'hgroup', 'dd', 'main', 'bdi', 'bdo', 'cite', 'data', 'dfn',
+  //     'ruby', 'small', 'time', 'audio', 'track', 'video', 'picture', 'caption',
+  //     'button', 'datalist', 'fieldset', 'form', 'meter', 'optgroup', 'select',
+  //     'details', 'big', 'abbr'
+  //   ],
+  //   replacement: function(content) {
+  //     return content;
+  //   }
+  turndownService.addRule('none', {
     filter: [
       'rp', 'rt', 'rtc', 'wbr', 'area', 'map', 'embed', 'object', 'param',
       'source', 'canvas', 'noscript', 'script', 'input', 'output'
@@ -1373,8 +1374,7 @@ RedmineWysiwygEditor.prototype._initMarkdown = function() {
     replacement: function() {
       return '';
     }
-  }).keep(['sup', 'sub']);
-
+  });
   return turndownService;
 };
 
@@ -1388,7 +1388,6 @@ RedmineWysiwygEditor.prototype._setPreview = function() {
 
     var data = {};
     data[name] = textarea[0].value + ' ';
-
     params.push($.param(data));
 
     return params.join('&');
