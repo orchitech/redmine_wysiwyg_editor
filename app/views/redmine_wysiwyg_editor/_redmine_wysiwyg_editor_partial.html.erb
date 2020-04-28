@@ -7,9 +7,13 @@ if content_for(:header_tags).present? && content_for(:header_tags).include?('/js
     if formatting == 'textile' %>
       <%= javascript_include_tag('to-textile.min.js', plugin: 'redmine_wysiwyg_editor') %>
     <% elsif formatting == 'markdown' %>
-      <%= javascript_include_tag('turndown.js', plugin: 'redmine_wysiwyg_editor') %>
-      <%= javascript_include_tag('turndown-plugin-gfm.js', plugin: 'redmine_wysiwyg_editor') %>
+      <%= javascript_include_tag('turndown-service.umd.js', plugin: 'redmine_wysiwyg_editor') %>
     <% end %>
+    <%= javascript_include_tag('languages.js', plugin: 'redmine_wysiwyg_editor') %>
+    <%= javascript_include_tag('converterUtils.js', plugin: 'redmine_wysiwyg_editor') %>
+    <%= javascript_include_tag('editorUtils.js', plugin: 'redmine_wysiwyg_editor') %>
+    <%= javascript_include_tag('commonRules.js', plugin: 'redmine_wysiwyg_editor') %>
+    <%= javascript_include_tag('converters.js', plugin: 'redmine_wysiwyg_editor') %>
     <%= javascript_include_tag('redmine_wysiwyg_editor.js', plugin: 'redmine_wysiwyg_editor') %>
     <%= stylesheet_link_tag('redmine_wysiwyg_editor.css', plugin: 'redmine_wysiwyg_editor') %>
     <%

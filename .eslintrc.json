@@ -11,7 +11,11 @@
     "tinymce": false,
     "toTextile": false,
     "TurndownService": false,
-    "turndownPluginGfm": false,
+    "EditorUtils": false,
+    "ConverterUtils": false,
+    "Languages": false,
+    "CommonRules": false,
+    "Converters": false,
     "require": false,
     "module": false
   },
