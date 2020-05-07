@@ -1,17 +1,20 @@
 (function(root, factory) {
   if (typeof exports === 'object') {
     module.exports = factory(require('./commonRules'),
-      require('./converterUtils'));
+      require('./converterUtils'),
+      require('./redmine-formatting.cjs'));
   } else {
     var commonRules = (typeof CommonRules !== 'undefined') ? CommonRules : null;
     var utils = (typeof ConverterUtils !== 'undefined') ? ConverterUtils : null;
-    root.Converters = factory(commonRules, utils);
+    var redmineFormatting = (typeof RedmineFormatting !== 'undefined') ? RedmineFormatting : null;
+    root.Converters = factory(commonRules, utils, redmineFormatting);
   }
-}(this, function(CommonRules, ConverterUtils) {
+}(this, function(CommonRules, ConverterUtils, RedmineFormatting) {
   function Converters() {
 
     this.utils = new ConverterUtils();
     this.commonRules = new CommonRules(this.utils);
+    this.redmineFormatting = new RedmineFormatting();
   }
 
   Converters.prototype.initMarkdown = function(turndownService, projectKey) {
@@ -393,8 +396,10 @@
     });
   };
 
-  Converters.prototype.escapeText = function(data, format) {
-    return (format === 'textile' ? escapeTextile(data) : escapeMarkdown(data))
+  Converters.prototype.preprocessTextForRendering = function(data, format) {
+    // this is yet to be implemented, preprocessing should be handled in RedmineFormatting
+    return this.redmineFormatting.preprocessTextForWysiwygRendering((format === 'textile'
+      ? preprocessTextile(data) : preprocessMarkdown(data)))
       .replace(/\{\{/g, '{$${')
       .replace(/document:/g, 'document$$:')
       .replace(/forum:/g, 'forum$$:')
@@ -403,16 +408,27 @@
       + '\n\n&nbsp;'; // Append NBSP to suppress 'Nothing to preview'
   };
 
-  Converters.prototype.unescapeHTML = function(data, format) {
+  Converters.prototype.postprocessHtml = function(data) {
     // FIXME: Lost if exists in PRE.
-    return (format === 'textile' ? unescapeHtmlTextile(data) : unescapeHtmlMarkdown(data))
-    .replace(/\$(.)/g, '$1')
-    .replace(/<legend>.+<\/legend>/g, '')
-    .replace(/<a name=.+?><\/a>/g, '')
-    .replace(/<a href="#(?!note-\d+).+?>.+<\/a>/g, '');
+    // this is yet to be implemented, postprocessing should be handled in RedmineFormatting
+    return this.redmineFormatting.postprocessHtmlForWysiwyg(data)
+      .replace(/\$(.)/g, '$1')
+      .replace(/<legend>.+<\/legend>/g, '')
+      .replace(/<a name=.+?><\/a>/g, '')
+      .replace(/<a href="#(?!note-\d+).+?>.+<\/a>/g, '');
   };
 
-  function escapeTextile(data) {
+  Converters.prototype.preprocessHtmlForConversion = function(html) {
+    // this is yet to be implemented
+    return this.redmineFormatting.preprocessWysiwygHtmlForConversion(html);
+  }
+
+  Converters.prototype.postprocessConvertedText = function(text) {
+    // this is yet to be implemented
+    return this.redmineFormatting.postprocessConvertedText(text);
+  }
+
+  function preprocessTextile(data) {
     return data
       .replace(/&#([1-9][0-9]*);/g, '&$$#$1;')
       .replace(/<code>\n?/g, '<code>')
@@ -423,24 +439,8 @@
       .replace(/^fn(\d+)\.\s/mg, 'fn$$$1. ');
   }
 
-  function escapeMarkdown(data) {
-    return htmlEncodedMacro(data)
-      // .replace(/^~~~ *(\w+)([\S\s]+?)~~~$/mg, '~~~\n$1+-*/!?$2~~~')
-      // .replace(/^``` *(\w+)([\S\s]+?)```$/mg, '~~~\n$1+-*/!?$2~~~');
-  }
-
-  function htmlEncodedMacro(data) {
-    // FIXME prevent Redmine macro from executing in editor
+  function preprocessMarkdown(data) {
     return data;
-  }
-
-  function unescapeHtmlTextile(data) {
-    return data;
-  }
-
-  function unescapeHtmlMarkdown(data) {
-    return data.replace(/<pre>(\w+)\+-\*\/!\?([\S\s]+?)<\/pre>/g,
-      '<pre data-code="$1">$2</pre>');
   }
 
   return Converters;

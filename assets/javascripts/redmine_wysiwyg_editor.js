@@ -645,7 +645,8 @@ RedmineWysiwygEditor.prototype._setVisualContent = function() {
     var name = self._oldPreviewAccess ? textarea[0].name : 'text';
     var data = {};
 
-    data[name] = converters.escapeText(textarea[0].value.replace(/\$/g, '$$$$'), self._format);
+    data[name] = converters.preprocessTextForRendering(textarea[0].value.replace(/\$/g, '$$$$'),
+      self._format);
     params.push($.param(data));
 
     return params.join('&');
@@ -656,7 +657,7 @@ RedmineWysiwygEditor.prototype._setVisualContent = function() {
     url: self._previewUrl,
     data: previewData(self._jstEditorTextArea),
     success: function(data) {
-      self._editor.setContent(converters.unescapeHTML(data, self._format));
+      self._editor.setContent(converters.postprocessHtml(data));
     }
   });
 };
@@ -684,12 +685,14 @@ RedmineWysiwygEditor.prototype._setTextContent = function() {
   var self = this;
 
   var html = self._editor.getContent();
+  var preparedHtml = converters.preprocessHtmlForConversion(html);
 
   var text = (self._format === 'textile') ?
-      self._toTextTextile(html) :
-      self._toTextMarkdown(html);
+      self._toTextTextile(preparedHtml) :
+      self._toTextMarkdown(preparedHtml);
+  var processedText = converters.postprocessConvertedText(text);
 
-  self._jstEditorTextArea.val(text);
+  self._jstEditorTextArea.val(processedText);
 };
 
 RedmineWysiwygEditor.prototype._toTextTextile = function(content) {

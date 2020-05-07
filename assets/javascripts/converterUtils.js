@@ -24,22 +24,22 @@
     return null;
   };
 
-  ConverterUtils.prototype.imageUrl = function(url, attachment) {
-    var encodedName = function(name) {
-      return name
-        .replace(/["%'*:<>?]/g, '_')
-        .replace(/[ !&()+[\]]/g, function(c) {
-          return '%' + c.charCodeAt(0).toString(16);
-        });
-    };
+  ConverterUtils.prototype.encodedName = function(name) {
+    return name
+      .replace(/["%'*:<>?]/g, '_')
+      .replace(/[ !&()+[\]]/g, function(c) {
+        return '%' + c.charCodeAt(0).toString(16);
+      });
+  }
 
+  ConverterUtils.prototype.imageUrl = function(url, attachment) {
     var base = decodeURIComponent(url.replace(/^.+\//, ''));
     var dir = url.replace(/\/[^/]*$/, '');
 
     var m = dir.match(/\/attachments\/download\/(\d+)$/);
     var id = m ? parseInt(m[1]) : null;
 
-    return (id && (attachment[base] === id)) ? encodedName(base) : url;
+    return (id && (attachment[base] === id)) ? this.encodedName(base) : url;
   };
 
   ConverterUtils.prototype.gluableContent = function(content, node, glue) {

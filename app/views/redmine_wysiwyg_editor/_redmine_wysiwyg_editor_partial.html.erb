@@ -9,6 +9,7 @@ if content_for(:header_tags).present? && content_for(:header_tags).include?('/js
     <% elsif formatting == 'markdown' %>
       <%= javascript_include_tag('turndown-service.umd.js', plugin: 'redmine_wysiwyg_editor') %>
     <% end %>
+    <%= javascript_include_tag('redmine-formatting.umd.js', plugin: 'redmine_wysiwyg_editor') %>
     <%= javascript_include_tag('languages.js', plugin: 'redmine_wysiwyg_editor') %>
     <%= javascript_include_tag('converterUtils.js', plugin: 'redmine_wysiwyg_editor') %>
     <%= javascript_include_tag('editorUtils.js', plugin: 'redmine_wysiwyg_editor') %>
