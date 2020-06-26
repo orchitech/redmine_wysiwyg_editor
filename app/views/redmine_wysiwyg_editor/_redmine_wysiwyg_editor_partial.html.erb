@@ -7,7 +7,7 @@ if content_for(:header_tags).present? && content_for(:header_tags).include?('/js
     if formatting == 'textile' %>
       <%= javascript_include_tag('to-textile.min.js', plugin: 'redmine_wysiwyg_editor') %>
     <% elsif formatting == 'markdown' %>
-      <%= javascript_include_tag('turndown.js', plugin: 'redmine_wysiwyg_editor') %>
+      <%= javascript_include_tag('turndown-redmine.js', plugin: 'redmine_wysiwyg_editor') %>
       <%= javascript_include_tag('turndown-plugin-gfm.js', plugin: 'redmine_wysiwyg_editor') %>
     <% end %>
     <%= javascript_include_tag('redmine_wysiwyg_editor.js', plugin: 'redmine_wysiwyg_editor') %>

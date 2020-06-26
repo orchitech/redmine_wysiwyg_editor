@@ -284,25 +284,27 @@ suite('Redmine WYSIWYG Editor', function() {
 
     test('Auto link (mailto)', function() {
       var content = '<a href="mailto:foo@example.com">foo@example.com</a><br><a href="mailto:foo@example.com">foo@example.com</a><br>foo<a href="mailto:foo@example.com">foo@example.com</a><br><a href="mailto:foo@example.com">foo@example.com</a>bar<br>foo<a href="mailto:foo@example.com">foo@example.com</a>bar';
-      var expected = 'foo@example.com\nfoo@example.com\nfoo foo@example.com\nfoo@example.com bar\nfoo foo@example.com bar';
+      var expected = '<foo@example.com>  \n<foo@example.com>  \nfoo<foo@example.com>  \n<foo@example.com>bar  \nfoo<foo@example.com>bar';
 
       assert.equal(x._toTextMarkdown(content), expected);
     });
 
     test('Auto link (http)', function() {
       var content = '<a href="http://example.com">http://example.com</a><br><a href="http://example.com">http://example.com</a><br>foo<a href="http://example.com">http://example.com</a><br><a href="http://example.com">http://example.com</a>bar<br>foo<a href="http://example.com">http://example.com</a>bar';
-      var expected = 'http://example.com\nhttp://example.com\nfoo http://example.com\nhttp://example.com bar\nfoo http://example.com bar';
+      var expected = '<http://example.com>  \n<http://example.com>  \nfoo<http://example.com>  \n<http://example.com>bar  \nfoo<http://example.com>bar';
 
       assert.equal(x._toTextMarkdown(content), expected);
     });
 
+    // this is not commonmark autolink
     test('Auto link (http with trailing slash)', function() {
       var content = '<a href="http://example.com/">http://example.com</a><br><a href="http://example.com/">http://example.com</a><br>foo<a href="http://example.com/">http://example.com</a><br><a href="http://example.com/">http://example.com</a>bar<br>foo<a href="http://example.com/">http://example.com</a>bar';
-      var expected = 'http://example.com\nhttp://example.com\nfoo http://example.com\nhttp://example.com bar\nfoo http://example.com bar';
+      var expected = '[http://example.com](http://example.com/)  \n[http://example.com](http://example.com/)  \nfoo[http://example.com](http://example.com/)  \n[http://example.com](http://example.com/)bar  \nfoo[http://example.com](http://example.com/)bar';
 
       assert.equal(x._toTextMarkdown(content), expected);
     });
 
+    // RedCarpert's table syntax - currently not supported by turndown-plugin-gfm used in turndown-redmine
     test('Table', function() {
       var content = '<table><tbody><tr><th>Name</th><th style="text-align: left;">Role</th><th style="text-align: center;">Born</th><th style="text-align: right;"><p>Origin</p></th></tr><tr><td>Axl Rose</td><td>Vocal</td><td>Feb 6, 1962</td><td>LA</td></tr><tr><td>Slash</td><td>Guitar</td><td><p>Jul 23, 1965</p></td><td>LA</td></tr></tbody></table>';
       var expected = '| Name | Role | Born | Origin |\n| --- | :-- | :-: | --: |\n| Axl Rose | Vocal | Feb 6, 1962 | LA |\n| Slash | Guitar | Jul 23, 1965 | LA |';
@@ -319,41 +321,41 @@ suite('Redmine WYSIWYG Editor', function() {
 
     test('Preformatted', function() {
       var content = '<pre>#include &lt;stdio.h&gt;\n\nint main(int argc, char *argv[])\n{\n    printf("Hello, world\n");\n\n    return 0;\n}\n</pre>\n\n<pre>No newline at the end of the content</pre>';
-      var expected = '~~~\n#include <stdio.h>\n\nint main(int argc, char *argv[])\n{\n    printf("Hello, world\n");\n\n    return 0;\n}\n~~~\n\n~~~\nNo newline at the end of the content\n~~~';
+      var expected = '```\n#include <stdio.h>\n\nint main(int argc, char *argv[])\n{\n    printf("Hello, world\n");\n\n    return 0;\n}\n```\n\n```\nNo newline at the end of the content\n```';
 
       assert.equal(x._toTextMarkdown(content), expected);
     });
 
     test('Code block', function() {
-      var content = '<pre data-code="c">#include &lt;stdio.h&gt;\n\nint main(int argc, char *argv[])\n{\n    printf("Hello, world\n");\n\n    return 0;\n}\n</pre>';
-      var expected = '~~~ c\n#include <stdio.h>\n\nint main(int argc, char *argv[])\n{\n    printf("Hello, world\n");\n\n    return 0;\n}\n~~~';
+      var content = '<pre class="c syntaxhl">#include &lt;stdio.h&gt;\n\nint main(int argc, char *argv[])\n{\n    printf("Hello, world\n");\n\n    return 0;\n}\n</pre>';
+      var expected = '``` c\n#include <stdio.h>\n\nint main(int argc, char *argv[])\n{\n    printf("Hello, world\n");\n\n    return 0;\n}\n```';
 
       assert.equal(x._toTextMarkdown(content), expected);
     });
 
     test('Code block (code sample plugin)', function() {
       var content = '<pre class="language-c" contenteditable="false"><code>#include &lt;stdio.h&gt;\n\nint main(int argc, char *argv[])\n{\n    printf("Hello, world\n");\n\n    return 0;\n}\n</code></pre>';
-      var expected = '~~~ c\n#include <stdio.h>\n\nint main(int argc, char *argv[])\n{\n    printf("Hello, world\n");\n\n    return 0;\n} \n~~~';
+      var expected = '``` c\n#include <stdio.h>\n\nint main(int argc, char *argv[])\n{\n    printf("Hello, world\n");\n\n    return 0;\n}\n```';
 
       assert.equal(x._toTextMarkdown(content), expected);
     });
 
     test('Block quote', function() {
       var content = '<blockquote><blockquote><p>Rails is a full-stack framework for developing database-backed web applications according to the Model-View-Control pattern.<br>To go live, all you need to add is a database and a web server.</p></blockquote><p>Great!</p></blockquote>';
-      var expected = '> > Rails is a full-stack framework for developing database-backed web applications according to the Model-View-Control pattern.\n> > To go live, all you need to add is a database and a web server.\n> \n> Great!';
+      var expected = '> > Rails is a full-stack framework for developing database-backed web applications according to the Model-View-Control pattern.  \n> > To go live, all you need to add is a database and a web server.\n> \n> Great!';
       assert.equal(x._toTextMarkdown(content), expected);
     });
 
     test('Image (external)', function() {
       var content = '<img src="http://example.com/foo.png" alt="Foo"><br><img src="http://example.com/attachments/download/10/foo.png" alt="Foo">';
-      var expected = '![Foo](http://example.com/foo.png)\n![Foo](http://example.com/attachments/download/10/foo.png)';
+      var expected = '![Foo](http://example.com/foo.png)  \n![Foo](http://example.com/attachments/download/10/foo.png)';
 
       assert.equal(x._toTextMarkdown(content), expected);
     });
 
     test('Image (attachment)', function() {
       var content = '<img src="/attachments/download/1/foo.png" alt="Foo"><br><img src="/attachments/download/2/f%20o%20o.png"><br><img src="/attachments/download/3/%E3%83%95%E3%83%BC.png"><br><img src="/attachments/download/4/%21%26%28%29%2B%5B%5D.png">';
-      var expected = '![Foo](foo.png)\n![](f%20o%20o.png)\n![](フー.png)\n![](%21%26%28%29%2b%5b%5d.png)';
+      var expected = '![Foo](foo.png)  \n![](f%20o%20o.png)  \n![](フー.png)  \n![](%21%26%28%29%2b%5b%5d.png)';
 
       assert.equal(x._toTextMarkdown(content), expected);
     });
@@ -374,7 +376,7 @@ suite('Redmine WYSIWYG Editor', function() {
 
     test('HTML tag (SPAN)', function() {
       var content = '<span style="color:red">red</span> <span style="color:green">green</span> <span style="color:yellow">yellow</span> <span style="color:#82B6E1">blue ish</span><br>\n<span style="color:red">red</span><span style="color:green">green</span><span style="color:yellow">yellow</span><span style="color:#82B6E1">blue ish</span><br>\n<span style="background-color:lightgreen">Lightgreen Background</span> <span style="background-color:yellow">Yellow Background</span><br>\n<span style="background-color:lightgreen">Lightgreen Background</span><span style="background-color:yellow">Yellow Background</span>';
-      var expected = '<span style="color: red;">red</span> <span style="color: green;">green</span> <span style="color: yellow;">yellow</span> <span style="color: rgb(130, 182, 225);">blue ish</span>\n<span style="color: red;">red</span><span style="color: green;">green</span><span style="color: yellow;">yellow</span><span style="color: rgb(130, 182, 225);">blue ish</span>\n<span style="background-color: lightgreen;">Lightgreen Background</span> <span style="background-color: yellow;">Yellow Background</span>\n<span style="background-color: lightgreen;">Lightgreen Background</span><span style="background-color: yellow;">Yellow Background</span>';
+      var expected = '<span style="color: red;">red</span> <span style="color: green;">green</span> <span style="color: yellow;">yellow</span> <span style="color: rgb(130, 182, 225);">blue ish</span>  \n<span style="color: red;">red</span><span style="color: green;">green</span><span style="color: yellow;">yellow</span><span style="color: rgb(130, 182, 225);">blue ish</span>  \n<span style="background-color: lightgreen;">Lightgreen Background</span> <span style="background-color: yellow;">Yellow Background</span>  \n<span style="background-color: lightgreen;">Lightgreen Background</span><span style="background-color: yellow;">Yellow Background</span>';
 
       assert.equal(x._toTextMarkdown(content), expected);
     });
@@ -388,14 +390,14 @@ suite('Redmine WYSIWYG Editor', function() {
 
     test('Font styles', function() {
       var content = 'Under<ins>line</ins><br>Plain<sup>superscript</sup><br>Plain<sub>subscript</sub>';
-      var expected = 'Under<ins>line</ins>\nPlain<sup>superscript</sup>\nPlain<sub>subscript</sub>';
+      var expected = 'Under<ins>line</ins>  \nPlain<sup>superscript</sup>  \nPlain<sub>subscript</sub>';
 
       assert.equal(x._toTextMarkdown(content), expected);
     });
 
     test('Wiki link', function() {
       var content = '<a class="wiki-page" href="/redmine/projects/aerosmith/wiki/Aerosmith#Steven">Steven Tyler</a><br><a class="wiki-page" href="/redmine/projects/aerosmith/wiki/Aerosmith">Joe</a><br><a class="wiki-page" href="/redmine/projects/aerosmith/wiki/Aerosmith">Aerosmith</a><br><a class="wiki-page" href="/redmine/projects/aerosmith/wiki">Aerosmith Wiki</a><br><a class="wiki-page" href="/redmine/projects/aerosmith/wiki">aerosmith</a><br><a class="wiki-page" href="/redmine/projects/gnr/wiki/GnR#Axl">Axl Rose</a><br><a class="wiki-page" href="/redmine/projects/gnr/wiki/GnR">Slash</a><br><a class="wiki-page" href="/redmine/projects/gnr/wiki/GnR">GnR</a><br><a class="wiki-page" href="/redmine/projects/gnr/wiki">Guns N\' Roses</a><br><a class="wiki-page" href="/redmine/projects/gnr/wiki">gnr</a><br><a class="wiki-page" href="/redmine/projects/gnr/wiki/GnR?parent=Wiki">GnR</a><br><a class="wiki-page" href="#Axl">#Axl</a><br><a class="wiki-page" href="#Axl">Axl Rose</a>';
-      var expected = '[[aerosmith:Aerosmith#Steven|Steven Tyler]]\n[[aerosmith:Aerosmith|Joe]]\n[[aerosmith:Aerosmith]]\n[[aerosmith:|Aerosmith Wiki]]\n[[aerosmith:]]\n[[GnR#Axl|Axl Rose]]\n[[GnR|Slash]]\n[[GnR]]\n[[gnr:|Guns N\' Roses]]\n[[gnr:]]\n[[GnR]]\n[[#Axl]]\n[[#Axl|Axl Rose]]';
+      var expected = '[[aerosmith:Aerosmith#Steven|Steven Tyler]]  \n[[aerosmith:Aerosmith|Joe]]  \n[[aerosmith:Aerosmith]]  \n[[aerosmith:|Aerosmith Wiki]]  \n[[aerosmith:]]  \n[[GnR#Axl|Axl Rose]]  \n[[GnR|Slash]]  \n[[GnR]]  \n[[gnr:|Guns N\' Roses]]  \n[[gnr:]]  \n[[GnR]]  \n[[#Axl]]  \n[[#Axl|Axl Rose]]';
 
       assert.equal(x._toTextMarkdown(content), expected);
     });
@@ -409,21 +411,21 @@ suite('Redmine WYSIWYG Editor', function() {
 
     test('Resource link (version)', function() {
       var content = '<a class="version">1.0.0</a><br><a class="version">1 0 0</a>';
-      var expected = 'version:1.0.0\nversion:"1 0 0"';
+      var expected = 'version:1.0.0  \nversion:"1 0 0"';
 
       assert.equal(x._toTextMarkdown(content), expected);
     });
 
     test('Resource link (attachment)', function() {
       var content = '<a class="attachment">foo.png</a><br><a class="attachment">f o o.png</a>';
-      var expected = 'attachment:foo.png\nattachment:"f o o.png"';
+      var expected = 'attachment:foo.png  \nattachment:"f o o.png"';
 
       assert.equal(x._toTextMarkdown(content), expected);
     });
 
     test('Resource link (project)', function() {
       var content = '<a class="project">X</a><br><a class="project">X Y Z</a>';
-      var expected = 'project:X\nproject:"X Y Z"';
+      var expected = 'project:X  \nproject:"X Y Z"';
 
       assert.equal(x._toTextMarkdown(content), expected);
     });
@@ -444,7 +446,7 @@ suite('Redmine WYSIWYG Editor', function() {
 
     test('NBSP', function() {
       var content = 'foo<br>&nbsp;<a class="issue">#1</a><br><a class="issue">#2</a>&nbsp;<br>&nbsp;<a class="issue">#3</a>&nbsp;<br>bar';
-      var expected = 'foo\n\u00a0 #1\n#2 \u00a0\n\u00a0 #3 \u00a0\nbar';
+      var expected = 'foo  \n\u00a0 #1  \n#2 \u00a0  \n\u00a0 #3 \u00a0  \nbar';
 
       assert.equal(x._toTextMarkdown(content), expected);
     });
@@ -461,7 +463,7 @@ suite('Redmine WYSIWYG Editor', function() {
 
     test('Image (attachment)', function() {
       var content = '<img src="/attachments/download/1/foo.png" alt="Foo"><br><img src="/attachments/download/2/f%20o%20o.png"><br><img src="/attachments/download/3/%E3%83%95%E3%83%BC.png"><br><img src="/attachments/download/4/%21%26%28%29%2B%5B%5D.png">';
-      var expected = '![Foo](foo.png)\n![](f%20o%20o.png)\n![](フー.png)\n![](%21%26%28%29%2b%5b%5d.png)';
+      var expected = '![Foo](foo.png)  \n![](f%20o%20o.png)  \n![](フー.png)  \n![](%21%26%28%29%2b%5b%5d.png)';
 
       assert.equal(x._toTextMarkdown(content), expected);
     });
@@ -469,7 +471,7 @@ suite('Redmine WYSIWYG Editor', function() {
     test('Image (resized)', function() {
       var content = '<img src="/attachments/download/1/foo.png" alt="Foo" width="5296" height="3972"><br><img src="/attachments/download/2/f%20o%20o.png" width="5296" height="3972"><br><img src="/attachments/download/3/%E3%83%95%E3%83%BC.png" width="5296" height="3972">';
 
-      var expected = '<img src="/attachments/download/1/foo.png" alt="Foo" width="5296" height="3972">\n<img src="/attachments/download/2/f%20o%20o.png" width="5296" height="3972">\n<img src="/attachments/download/3/%E3%83%95%E3%83%BC.png" width="5296" height="3972">';
+      var expected = '<img src="/attachments/download/1/foo.png" alt="Foo" width="5296" height="3972">  \n<img src="/attachments/download/2/f%20o%20o.png" width="5296" height="3972">  \n<img src="/attachments/download/3/%E3%83%95%E3%83%BC.png" width="5296" height="3972">';
 
       assert.equal(x._toTextMarkdown(content), expected);
     });
