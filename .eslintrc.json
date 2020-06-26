@@ -10,7 +10,7 @@
     "$": false,
     "tinymce": false,
     "toTextile": false,
-    "TurndownService": false,
+    "TurndownRedmine": false,
     "turndownPluginGfm": false,
     "require": false,
     "module": false
