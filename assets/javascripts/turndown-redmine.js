@@ -266,17 +266,6 @@
 
   var rules$1 = {};
 
-  rules$1.text = {
-    filter: '#text',
-
-    replacement: function (content, node, options) {
-      if (node.isCode) return node.nodeValue
-      return options.escapes.reduce(function (accumulator, escape) {
-        return accumulator.replace(escape[0], escape[1])
-      }, node.nodeValue).trim()
-    }
-  };
-
   rules$1.paragraph = {
     filter: 'p',
 
@@ -507,23 +496,16 @@
       return node.nodeName === 'CODE' && !isCodeBlock
     },
 
-    replacement: function (content, node, options) {
-      if (options.preformattedCode) {
-        content = content.replace(/^\n+|\n+$/g, '').replace(/\n/, ' ');
-      }
-      if (options.preformattedCode ? !content : !content.trim()) return ''
+    replacement: function (content) {
+      if (!content) return ''
+      content = content.replace(/\r?\n|\r/g, ' ');
 
+      var extraSpace = /^`|^ .*?[^ ].* $|`$/.test(content) ? ' ' : '';
       var delimiter = '`';
-      var leadingSpace = '';
-      var trailingSpace = '';
-      var matches = content.match(/`+/gm);
-      if (matches) {
-        if (/^`/.test(content)) leadingSpace = ' ';
-        if (/`$/.test(content)) trailingSpace = ' ';
-        while (matches.indexOf(delimiter) !== -1) delimiter = delimiter + '`';
-      }
+      var matches = content.match(/`+/gm) || [];
+      while (matches.indexOf(delimiter) !== -1) delimiter = delimiter + '`';
 
-      return delimiter + leadingSpace + content + trailingSpace + delimiter
+      return delimiter + extraSpace + content + extraSpace + delimiter
     }
   };
 
@@ -551,6 +533,10 @@
     this.options = options;
     this._keep = [];
     this._remove = [];
+
+    this.textRule = {
+      replacement: options.textReplacement
+    };
 
     this.blankRule = {
       replacement: options.blankReplacement
@@ -588,6 +574,7 @@
     },
 
     forNode: function (node) {
+      if (node.nodeType === 3) return this.textRule
       if (node.isBlank) return this.blankRule
       var rule;
 
@@ -888,7 +875,7 @@
 
     // abandon trailing ASCII WS if right-flanked by ASCII WS
     if (edges.trailingAscii && isFlankedByWhitespace('right', node, options)) {
-      edges.leading = edges.trailingNonAscii;
+      edges.trailing = edges.trailingNonAscii;
     }
 
     return { leading: edges.leading, trailing: edges.trailing }
@@ -934,7 +921,7 @@
   var reduce = Array.prototype.reduce;
   var leadingNewLinesRegExp = /^\n*/;
   var trailingNewLinesRegExp = /\n*$/;
-  var DEFAULT_ESCAPES = [
+  var ESCAPES = [
     [/\\/g, '\\\\'],
     [/\*/g, '\\*'],
     [/^-/g, '\\-'],
@@ -953,9 +940,10 @@
   function TurndownService (options) {
     if (!(this instanceof TurndownService)) return new TurndownService(options)
 
+    var self = this;
     var defaults = {
       rules: rules$1,
-      escapes: DEFAULT_ESCAPES,
+      escapes: ESCAPES,
       headingStyle: 'setext',
       hr: '* * *',
       bulletListMarker: '*',
@@ -966,6 +954,7 @@
       linkStyle: 'inlined',
       linkReferenceStyle: 'full',
       br: '  ',
+      preformattedCode: false,
       blankReplacement: function (content, node) {
         return node.isBlock ? '\n\n' : ''
       },
@@ -975,7 +964,9 @@
       defaultReplacement: function (content, node) {
         return node.isBlock ? '\n\n' + content + '\n\n' : content
       },
-      preformattedCode: false
+      textReplacement: function (content, node, options) {
+        return node.isCode ? content : self.escape(content, node, options)
+      }
     };
     this.options = extend({}, defaults, options);
     this.rules = new Rules(this.options);
@@ -1060,6 +1051,20 @@
     remove: function (filter) {
       this.rules.remove(filter);
       return this
+    },
+
+    /**
+     * Escapes Markdown syntax
+     * @public
+     * @param {String} string The string to escape
+     * @returns A string with Markdown syntax escaped
+     * @type String
+     */
+
+    escape: function (content, node, options) {
+      return options.escapes.reduce(function (accumulator, escape) {
+        return accumulator.replace(escape[0], escape[1])
+      }, content)
     }
   };
 
@@ -1075,7 +1080,15 @@
     var self = this;
     return reduce.call(parentNode.childNodes, function (output, node) {
       node = new Node(node, self.options);
-      var replacement = replacementForNode.call(self, node);
+
+      var replacement = '';
+      if (node.nodeType === 3) {
+        var textRule = self.rules.forNode(node);
+        replacement = textRule.replacement(node.nodeValue, node, self.options);
+      } else if (node.nodeType === 1) {
+        replacement = replacementForNode.call(self, node);
+      }
+
       return join(output, replacement)
     }, '')
   }
@@ -1216,119 +1229,10 @@
   	throw new Error('Dynamic requires are not currently supported by @rollup/plugin-commonjs');
   }
 
-  var gfmEscape_umd = createCommonjsModule(function (module, exports) {
+  var unionReplacer_umd = createCommonjsModule(function (module, exports) {
   (function (global, factory) {
      module.exports = factory() ;
   }(commonjsGlobal, (function () {
-    function _typeof(obj) {
-      "@babel/helpers - typeof";
-
-      if (typeof Symbol === "function" && typeof Symbol.iterator === "symbol") {
-        _typeof = function (obj) {
-          return typeof obj;
-        };
-      } else {
-        _typeof = function (obj) {
-          return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj;
-        };
-      }
-
-      return _typeof(obj);
-    }
-
-    function _classCallCheck(instance, Constructor) {
-      if (!(instance instanceof Constructor)) {
-        throw new TypeError("Cannot call a class as a function");
-      }
-    }
-
-    function _defineProperties(target, props) {
-      for (var i = 0; i < props.length; i++) {
-        var descriptor = props[i];
-        descriptor.enumerable = descriptor.enumerable || false;
-        descriptor.configurable = true;
-        if ("value" in descriptor) descriptor.writable = true;
-        Object.defineProperty(target, descriptor.key, descriptor);
-      }
-    }
-
-    function _createClass(Constructor, protoProps, staticProps) {
-      if (protoProps) _defineProperties(Constructor.prototype, protoProps);
-      if (staticProps) _defineProperties(Constructor, staticProps);
-      return Constructor;
-    }
-
-    function _defineProperty(obj, key, value) {
-      if (key in obj) {
-        Object.defineProperty(obj, key, {
-          value: value,
-          enumerable: true,
-          configurable: true,
-          writable: true
-        });
-      } else {
-        obj[key] = value;
-      }
-
-      return obj;
-    }
-
-    function ownKeys(object, enumerableOnly) {
-      var keys = Object.keys(object);
-
-      if (Object.getOwnPropertySymbols) {
-        var symbols = Object.getOwnPropertySymbols(object);
-        if (enumerableOnly) symbols = symbols.filter(function (sym) {
-          return Object.getOwnPropertyDescriptor(object, sym).enumerable;
-        });
-        keys.push.apply(keys, symbols);
-      }
-
-      return keys;
-    }
-
-    function _objectSpread2(target) {
-      for (var i = 1; i < arguments.length; i++) {
-        var source = arguments[i] != null ? arguments[i] : {};
-
-        if (i % 2) {
-          ownKeys(Object(source), true).forEach(function (key) {
-            _defineProperty(target, key, source[key]);
-          });
-        } else if (Object.getOwnPropertyDescriptors) {
-          Object.defineProperties(target, Object.getOwnPropertyDescriptors(source));
-        } else {
-          ownKeys(Object(source)).forEach(function (key) {
-            Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key));
-          });
-        }
-      }
-
-      return target;
-    }
-
-    function _inherits(subClass, superClass) {
-      if (typeof superClass !== "function" && superClass !== null) {
-        throw new TypeError("Super expression must either be null or a function");
-      }
-
-      subClass.prototype = Object.create(superClass && superClass.prototype, {
-        constructor: {
-          value: subClass,
-          writable: true,
-          configurable: true
-        }
-      });
-      if (superClass) _setPrototypeOf(subClass, superClass);
-    }
-
-    function _getPrototypeOf(o) {
-      _getPrototypeOf = Object.setPrototypeOf ? Object.getPrototypeOf : function _getPrototypeOf(o) {
-        return o.__proto__ || Object.getPrototypeOf(o);
-      };
-      return _getPrototypeOf(o);
-    }
-
     function _setPrototypeOf(o, p) {
       _setPrototypeOf = Object.setPrototypeOf || function _setPrototypeOf(o, p) {
         o.__proto__ = p;
@@ -1351,137 +1255,21 @@
       }
     }
 
-    function _assertThisInitialized(self) {
-      if (self === void 0) {
-        throw new ReferenceError("this hasn't been initialised - super() hasn't been called");
+    function _construct(Parent, args, Class) {
+      if (_isNativeReflectConstruct()) {
+        _construct = Reflect.construct;
+      } else {
+        _construct = function _construct(Parent, args, Class) {
+          var a = [null];
+          a.push.apply(a, args);
+          var Constructor = Function.bind.apply(Parent, a);
+          var instance = new Constructor();
+          if (Class) _setPrototypeOf(instance, Class.prototype);
+          return instance;
+        };
       }
 
-      return self;
-    }
-
-    function _possibleConstructorReturn(self, call) {
-      if (call && (typeof call === "object" || typeof call === "function")) {
-        return call;
-      }
-
-      return _assertThisInitialized(self);
-    }
-
-    function _createSuper(Derived) {
-      var hasNativeReflectConstruct = _isNativeReflectConstruct();
-
-      return function () {
-        var Super = _getPrototypeOf(Derived),
-            result;
-
-        if (hasNativeReflectConstruct) {
-          var NewTarget = _getPrototypeOf(this).constructor;
-
-          result = Reflect.construct(Super, arguments, NewTarget);
-        } else {
-          result = Super.apply(this, arguments);
-        }
-
-        return _possibleConstructorReturn(this, result);
-      };
-    }
-
-    function _slicedToArray(arr, i) {
-      return _arrayWithHoles(arr) || _iterableToArrayLimit(arr, i) || _unsupportedIterableToArray(arr, i) || _nonIterableRest();
-    }
-
-    function _arrayWithHoles(arr) {
-      if (Array.isArray(arr)) return arr;
-    }
-
-    function _iterableToArrayLimit(arr, i) {
-      if (typeof Symbol === "undefined" || !(Symbol.iterator in Object(arr))) return;
-      var _arr = [];
-      var _n = true;
-      var _d = false;
-      var _e = undefined;
-
-      try {
-        for (var _i = arr[Symbol.iterator](), _s; !(_n = (_s = _i.next()).done); _n = true) {
-          _arr.push(_s.value);
-
-          if (i && _arr.length === i) break;
-        }
-      } catch (err) {
-        _d = true;
-        _e = err;
-      } finally {
-        try {
-          if (!_n && _i["return"] != null) _i["return"]();
-        } finally {
-          if (_d) throw _e;
-        }
-      }
-
-      return _arr;
-    }
-
-    function _unsupportedIterableToArray(o, minLen) {
-      if (!o) return;
-      if (typeof o === "string") return _arrayLikeToArray(o, minLen);
-      var n = Object.prototype.toString.call(o).slice(8, -1);
-      if (n === "Object" && o.constructor) n = o.constructor.name;
-      if (n === "Map" || n === "Set") return Array.from(o);
-      if (n === "Arguments" || /^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(n)) return _arrayLikeToArray(o, minLen);
-    }
-
-    function _arrayLikeToArray(arr, len) {
-      if (len == null || len > arr.length) len = arr.length;
-
-      for (var i = 0, arr2 = new Array(len); i < len; i++) arr2[i] = arr[i];
-
-      return arr2;
-    }
-
-    function _nonIterableRest() {
-      throw new TypeError("Invalid attempt to destructure non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method.");
-    }
-
-    function _classCallCheck$1(instance, Constructor) {
-      if (!(instance instanceof Constructor)) {
-        throw new TypeError("Cannot call a class as a function");
-      }
-    }
-
-    function _defineProperties$1(target, props) {
-      for (var i = 0; i < props.length; i++) {
-        var descriptor = props[i];
-        descriptor.enumerable = descriptor.enumerable || false;
-        descriptor.configurable = true;
-        if ("value" in descriptor) descriptor.writable = true;
-        Object.defineProperty(target, descriptor.key, descriptor);
-      }
-    }
-
-    function _createClass$1(Constructor, protoProps, staticProps) {
-      if (protoProps) _defineProperties$1(Constructor.prototype, protoProps);
-      if (staticProps) _defineProperties$1(Constructor, staticProps);
-      return Constructor;
-    }
-
-    function _toConsumableArray(arr) {
-      return _arrayWithoutHoles(arr) || _iterableToArray(arr) || _nonIterableSpread();
-    }
-
-    function _arrayWithoutHoles(arr) {
-      if (Array.isArray(arr)) {
-        for (var i = 0, arr2 = new Array(arr.length); i < arr.length; i++) arr2[i] = arr[i];
-
-        return arr2;
-      }
-    }
-
-    function _iterableToArray(iter) {
-      if (Symbol.iterator in Object(iter) || Object.prototype.toString.call(iter) === "[object Arguments]") return Array.from(iter);
-    }
-
-    function _nonIterableSpread() {
-      throw new TypeError("Invalid attempt to spread non-iterable instance");
+      return _construct.apply(null, arguments);
     }
 
     var createStringReplacer = function createStringReplacer(replacementStr) {
@@ -1525,21 +1313,14 @@
       return function callStringReplaceFn(ctx) {
         var m = ctx.match;
         var info = m.groups ? [m.index, m.input, m.groups] : [m.index, m.input];
-        return replacementFn.apply(this, [].concat(_toConsumableArray(m), info));
+        return replacementFn.apply(this, [].concat(m, info));
       };
     };
-    /**
-     * Single pattern and replacement encapsulation.
-     * @private
-     */
 
-
-    var UnionReplacerElement = /*#__PURE__*/function () {
+    var UnionReplacerElement = function () {
       function UnionReplacerElement(pattern, replacement, extended) {
-        _classCallCheck$1(this, UnionReplacerElement);
-
         if (pattern.constructor !== RegExp) {
-          throw new TypeError("Replacement pattern ".concat(pattern, " is not a RegExp."));
+          throw new TypeError("Replacement pattern " + pattern + " is not a RegExp.");
         }
 
         this.pattern = pattern;
@@ -1552,78 +1333,61 @@
         }
       }
 
-      _createClass$1(UnionReplacerElement, [{
-        key: "compile",
-        value: function compile(captureNum) {
-          var _this = this;
+      var _proto = UnionReplacerElement.prototype;
 
-          var captureCount = 0; // regexp adapted from https://github.com/slevithan/xregexp
+      _proto.compile = function compile(captureNum) {
+        var _this = this;
 
-          var parts = /(\(\?<)(?=[^!=])|(\()(?!\?)|\\([1-9]\d*)|\\[\s\S]|\[(?:[^\\\]]|\\[\s\S])*\]/g;
-          var patternStr = this.pattern.source.replace(parts, function (match, parenNamed, paren, backref) {
-            if (paren || parenNamed) {
-              captureCount++;
-            } else if (backref) {
-              if (+backref > captureCount) {
-                throw new SyntaxError("Octal or backreference to undefined capture group ".concat(backref, " in ").concat(_this.pattern));
-              } // renumber backreference
-
-
-              return "\\".concat(+backref + captureNum);
+        var captureCount = 0;
+        var parts = /(\(\?<)(?=[^!=])|(\()(?!\?)|\\([1-9]\d*)|\\[\s\S]|\[(?:[^\\\]]|\\[\s\S])*\]/g;
+        var patternStr = this.pattern.source.replace(parts, function (match, parenNamed, paren, backref) {
+          if (paren || parenNamed) {
+            captureCount++;
+          } else if (backref) {
+            if (+backref > captureCount) {
+              throw new SyntaxError("Octal or backreference to undefined capture group " + backref + " in " + _this.pattern);
             }
 
-            return match;
-          });
-          this.captureNum = captureNum;
-          this.capturePatternStr = "(".concat(patternStr, ")");
-          this.captureCount = captureCount + 1;
-        }
-        /* eslint-disable no-unused-vars */
+            return "\\" + (+backref + captureNum);
+          }
 
-      }, {
-        key: "narrowMatch",
-        value: function narrowMatch(ctx, totalCaptures) {
-          // eslint-disable-line no-unused-vars
-          // Much faster than modifying the match whit `splice()` on V8
-          var m0 = ctx.match;
-          var m1 = m0.slice(this.captureNum, this.captureNum + this.captureCount);
-          m1.index = m0.index;
-          m1.input = m0.input;
-          m1.groups = m0.groups;
-          ctx.match = m1;
-        }
-      }]);
+          return match;
+        });
+        this.captureNum = captureNum;
+        this.capturePatternStr = "(" + patternStr + ")";
+        this.captureCount = captureCount + 1;
+      };
+
+      _proto.narrowMatch = function narrowMatch(ctx, totalCaptures) {
+        var m0 = ctx.match;
+        var m1 = m0.slice(this.captureNum, this.captureNum + this.captureCount);
+        m1.index = m0.index;
+        m1.input = m0.input;
+        m1.groups = m0.groups;
+        ctx.match = m1;
+      };
 
       return UnionReplacerElement;
     }();
 
-    /**
-     * String processing builder that builds a string output in the same way
-     * how String.prototype.replace implementation does it.
-     */
-    var ReplacementStringBuilder = /*#__PURE__*/function () {
+    var ReplacementStringBuilder = function () {
       function ReplacementStringBuilder() {
-        _classCallCheck$1(this, ReplacementStringBuilder);
-
         this.output = '';
       }
 
-      _createClass$1(ReplacementStringBuilder, [{
-        key: "addSubjectSlice",
-        value: function addSubjectSlice(subject, start, end) {
-          this.output += subject.slice(start, end);
-        }
-      }, {
-        key: "addReplacedString",
-        value: function addReplacedString(string) {
-          this.output += string;
-        }
-      }, {
-        key: "build",
-        value: function build() {
-          return this.output;
-        }
-      }]);
+      var _proto = ReplacementStringBuilder.prototype;
+
+      _proto.addSubjectSlice = function addSubjectSlice(subject, start, end) {
+        this.output += subject.slice(start, end);
+      };
+
+      _proto.addReplacedString = function addReplacedString(string) {
+        this.output += string;
+      };
+
+      _proto.build = function build() {
+        return this.output;
+      };
 
       return ReplacementStringBuilder;
     }();
@@ -1642,49 +1406,38 @@
       var c2 = input.charCodeAt(index + 1);
       return c2 < 0xDC00 || c2 > 0xDFFF ? 1 : 2;
     };
-    /**
-     * Encapsulation of matcher variables.
-     */
 
-
-    var MatchingContext = /*#__PURE__*/function () {
+    var MatchingContext = function () {
       function MatchingContext(replacer) {
-        _classCallCheck$1(this, MatchingContext);
-
         this.replacer = replacer;
         this.match = null;
         this.lastIndex = 0;
       }
 
-      _createClass$1(MatchingContext, [{
-        key: "skip",
-        value: function skip(n) {
-          this.lastIndex = this.match.index + this.match[0].length + n;
-        }
-      }, {
-        key: "jump",
-        value: function jump(n) {
-          this.lastIndex = this.match.index + n;
-        }
-      }, {
-        key: "reset",
-        value: function reset() {
-          var index = this.match.index;
-          var mlen = this.match[0].length;
-          this.lastIndex = index + (mlen > 0 ? mlen : emptyMatchAdvance(this.match.input, index, this.replacer.regexp.unicode));
-        }
-      }, {
-        key: "atStart",
-        value: function atStart() {
-          return this.match.index === 0;
-        }
-      }, {
-        key: "atEnd",
-        value: function atEnd() {
-          var match = this.match;
-          return match.index + match[0].length >= match.input.length;
-        }
-      }]);
+      var _proto = MatchingContext.prototype;
+
+      _proto.skip = function skip(n) {
+        this.lastIndex = this.match.index + this.match[0].length + n;
+      };
+
+      _proto.jump = function jump(n) {
+        this.lastIndex = this.match.index + n;
+      };
+
+      _proto.reset = function reset() {
+        var index = this.match.index;
+        var mlen = this.match[0].length;
+        this.lastIndex = index + (mlen > 0 ? mlen : emptyMatchAdvance(this.match.input, index, this.replacer.regexp.unicode));
+      };
+
+      _proto.atStart = function atStart() {
+        return this.match && this.match.index === 0;
+      };
+
+      _proto.atEnd = function atEnd() {
+        var match = this.match;
+        return match && match.index + match[0].length >= match.input.length;
+      };
 
       return MatchingContext;
     }();
@@ -1693,15 +1446,13 @@
       return elements.reduce(function (num, element) {
         return num + element.captureCount;
       }, 0);
-    }; // Performance-critical
-
+    };
 
     var findMatchingElementEs6 = function findMatchingElementEs6(elements, fullMatch) {
       return elements.find(function (element) {
         return fullMatch[element.captureNum] !== undefined;
       });
-    }; // ...but avoid polyfill
-
+    };
 
     var findMatchingElementEs5 = function findMatchingElementEs5(elements, fullMatch) {
       for (var i = 0; i < elements.length; i++) {
@@ -1716,219 +1467,159 @@
     };
 
     var findMatchingElement = Array.prototype.find ? findMatchingElementEs6 : findMatchingElementEs5;
-    /**
-     * Class encapsulating several {@link String#replace}-like replacements
-     * combined into a single one-pass text processor.
-     */
 
-    var UnionReplacer = /*#__PURE__*/function () {
-      /**
-       * Create a union replacer and optionally initialize it with set of replace elements.
-       * @param {Array|string} [replacesOrFlags] Initial replaces, can be omitted
-       *   in favor of `flagsArg`.
-       * @param {string} [flagsArg] Flags for replacement, defaults to 'gm'.
-       * @example new UnionReplacer([[/\$foo\b/, 'bar']], [/\\(.)/, '$1']], 'gi')
-       * @example new UnionReplacer([[/\$foo\b/, 'bar']], [/\\(.)/, '$1']])
-       * @example new UnionReplacer('gi')
-       * @example new UnionReplacer()
-       * @see #addReplacement
-       * @see RegExp#flags
-       */
-      function UnionReplacer(replacesOrFlags, flagsArg) {
+    function compile() {
+      this.totalCaptureGroups = countCaptureGroups(this.elements);
+      var regexpStr = this.elements.length > 0 ? this.elements.map(function (element) {
+        return element.capturePatternStr;
+      }).join('|') : '^[^\\s\\S]';
+      this.regexp = new RegExp(regexpStr, this.flags);
+    }
+
+    var UnionReplacer = function () {
+      function UnionReplacer(replaces, flags) {
         var _this = this;
 
-        _classCallCheck$1(this, UnionReplacer);
-
-        var args = [replacesOrFlags, flagsArg];
-        var fnArgc = this.constructor.length;
-        arguments.length < fnArgc && !Array.isArray(replacesOrFlags) && args.unshift(undefined);
-
-        var _ref = [].concat(args),
-            _ref$ = _ref[0],
-            replaces = _ref$ === void 0 ? [] : _ref$,
-            _ref$2 = _ref[1],
-            flags = _ref$2 === void 0 ? 'gm' : _ref$2;
-        /** @readonly */
-
+        if (flags === void 0) {
+          flags = 'gm';
+        }
 
         this.flags = flags;
-        /** @private */
-
         this.elements = [];
-        /** @private */
+        replaces.forEach(function (replace) {
+          var element = _construct(UnionReplacerElement, replace);
 
-        this.compiled = false;
+          element.compile(countCaptureGroups(_this.elements) + 1);
 
-        if (replaces) {
-          replaces.forEach(function (replace) {
-            return _this.addReplacement.apply(_this, _toConsumableArray(replace));
-          });
-        }
+          _this.elements.push(element);
+        });
+        compile.call(this);
       }
-      /**
-       * Append a match and replace entry to this replacer. The order of `addReplacement`
-       * calls is important: if any pattern is matched, the corresponding amount of input
-       * is consumed and subsequent patterns will not match on such part of the input.
-       *
-       * @param {RegExp} pattern Regexp to match. The flags are ignored.
-       * @param {(string|Function)} replacement Replacement string or function to be
-       *   applied if the pattern matches.
-       *   Replacement strings:
-       *     - Syntax is the same as for {@link String#replace}:
-       *       {@link https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/replace#Specifying_a_string_as_a_parameter|Specifying a string as a parameter}
-       *     - ES2018 named capture groups follow the proposal syntax `$<name>`
-       *   Replacement function is by default the {@link String#replace}-style function:
-       *     - The same as for {@link String#replace}:
-       *       {@link https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/replace#Specifying_a_function_as_a_parameter|Specifying a function as a parameter}
-       *     - If ES2018 named capture groups are used, their values are passed
-       *       as the last argument just like in the standard JavaScript replacements:
-       *       `(match, p1, ..., pn, offset, string, namedCaptures) => { ... }`.
-       *       Unlike numbered captures that are narrowed for the particular match,
-       *       this extra `namedCaptures` parameter would contain keys for all the named
-       *       capture groups within the replacer and the values of "foreign" named captures
-       *       would be always `undefined`.
-       *   Replacement function can also be specified as `extended`. Then only one parameter is
-       *   passed, an instance of {@link MatchingContext}. This variant is more powerful.
-       * @param {boolean} [extended] If truthy, the {@link MatchingContext} will be passed
-       *   to the replacement function instead of {@link String#replace}-ish parameters.
-       * @throws {SyntaxError} Octal escapes are not allowed in patterns.
-       * @throws Will throw an error if the replacer is frozen, i.e. compiled.
-       * @see {@link https://github.com/orchitech/union-replacer/blob/master/README.md#alternation-semantics|Alternation semantics}
-       */
 
+      var _proto = UnionReplacer.prototype;
 
-      _createClass$1(UnionReplacer, [{
-        key: "addReplacement",
-        value: function addReplacement(pattern, replacement, extended) {
-          if (this.compiled) {
-            throw new Error('Dynamic element changes not yet supported.');
-          }
+      _proto.compile = function compile() {};
 
-          var element = new UnionReplacerElement(pattern, replacement, extended);
-          element.compile(countCaptureGroups(this.elements) + 1);
-          this.elements.push(element);
+      _proto.replace = function replace(subject, userCtx, builder) {
+        if (userCtx === void 0) {
+          userCtx = {};
         }
-        /**
-         * Process the configured replaces and prepare internal data structures.
-         * It is not needed to call this method explicitly as it is done automatically
-         * on first use on of the replacer.
-         * Calling this method makes sense to validate the replacer's pattern set
-         * and to fail early eventually.
-         * Currently it causes the replacements to be frozen, i.e. a subsequent
-         * {@link UnionReplacer#addReplacement} call would fail.
-         * Forward compatibility:
-         * - Freezing the replacements is not guaranteed behavior in the future.
-         * - If string-supplied regular expression patterns were allowed in methods like
-         *   {@link UnionReplacer#addReplacement}, it would also allow invalid patterns
-         *   to be supplied. Some sort of regexp syntax errors would be detected when
-         *   building the replacer and other would be detected at the #compile time.
-         * @throws {SyntaxError} Invalid regular expression pattern encountered. This
-         *   currently occurs when named capture groups of the same name are supplied
-         *   in different replacement patterns.
-         */
 
-      }, {
-        key: "compile",
-        value: function compile() {
-          this.totalCaptureGroups = countCaptureGroups(this.elements);
-          var regexpStr = this.elements.length > 0 ? this.elements.map(function (element) {
-            return element.capturePatternStr;
-          }).join('|') : '^[^\\s\\S]';
-          this.regexp = new RegExp(regexpStr, this.flags);
-          this.compiled = true;
+        if (builder === void 0) {
+          builder = new ReplacementStringBuilder();
         }
-        /**
-         * Perform search and replace with the combined patterns and use corresponding
-         * replacements for the particularly matched patterns.
-         * @param {String} subject Input to search and process.
-         * @param {Object} [userCtx={}] User-provided context to be passed as `this` when
-         *   calling replacement functions and as a parameter of the builder calls.
-         * @param {Object} [builder=new ReplacementStringBuilder()] Collects and builds
-         *   the result from unmatched subject slices and replaced matches. A custom
-         *   builder allows for creating arbitrary structures based on matching or e.g.
-         *   streaming these chunks without building any output.
-         * @returns {String|*} New string with the matches replaced. Or any type when a
-         *   custom builder is provided.
-         * @see #addReplacement
-         */
 
-      }, {
-        key: "replace",
-        value: function replace(subject) {
-          var userCtx = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
-          var builder = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : new ReplacementStringBuilder();
-          this.compiled || this.compile();
-          var ctx = new MatchingContext(this); // Allow for reentrancy
+        var ctx = new MatchingContext(this);
+        var savedLastIndex = this.regexp.lastIndex;
 
-          var savedLastIndex = this.regexp.lastIndex;
+        try {
+          this.regexp.lastIndex = 0;
+          var prevLastIndex = 0;
 
-          try {
-            this.regexp.lastIndex = 0;
-            var prevLastIndex = 0;
+          while ((ctx.match = this.regexp.exec(subject)) !== null) {
+            var element = findMatchingElement(this.elements, ctx.match);
+            element.narrowMatch(ctx, this.totalCaptureGroups);
+            ctx.reset();
+            builder.addSubjectSlice(subject, prevLastIndex, ctx.match.index, ctx, userCtx);
+            var replaced = element.replacementFn.call(userCtx, ctx);
+            builder.addReplacedString(replaced, ctx, userCtx);
+            prevLastIndex = Math.min(ctx.match.index + ctx.match[0].length, ctx.lastIndex);
+            this.regexp.lastIndex = ctx.lastIndex;
 
-            while ((ctx.match = this.regexp.exec(subject)) !== null) {
-              var element = findMatchingElement(this.elements, ctx.match);
-              element.narrowMatch(ctx, this.totalCaptureGroups);
-              ctx.reset();
-              builder.addSubjectSlice(subject, prevLastIndex, ctx.match.index, ctx, userCtx);
-              var replaced = element.replacementFn.call(userCtx, ctx);
-              builder.addReplacedString(replaced, ctx, userCtx);
-              prevLastIndex = Math.min(ctx.match.index + ctx.match[0].length, ctx.lastIndex); // Also would solve eventual reentrant calls, but needed anyway
-
-              this.regexp.lastIndex = ctx.lastIndex;
-
-              if (!this.regexp.global) {
-                break;
-              }
+            if (!this.regexp.global) {
+              break;
             }
-
-            builder.addSubjectSlice(subject, prevLastIndex, subject.length, ctx, userCtx);
-            return builder.build();
-          } finally {
-            this.regexp.lastIndex = savedLastIndex;
           }
+
+          builder.addSubjectSlice(subject, prevLastIndex, subject.length, ctx, userCtx);
+          return builder.build();
+        } finally {
+          this.regexp.lastIndex = savedLastIndex;
         }
-      }]);
+      };
 
       return UnionReplacer;
     }();
 
-    var BaseSyntax = /*#__PURE__*/function () {
-      function BaseSyntax(name) {
-        _classCallCheck(this, BaseSyntax);
+    return UnionReplacer;
 
+  })));
+  });
+
+  var gfmEscape_umd = createCommonjsModule(function (module, exports) {
+  (function (global, factory) {
+     module.exports = factory(unionReplacer_umd) ;
+  }(commonjsGlobal, (function (UnionReplacer) {
+    UnionReplacer = UnionReplacer && Object.prototype.hasOwnProperty.call(UnionReplacer, 'default') ? UnionReplacer['default'] : UnionReplacer;
+
+    function _defineProperties(target, props) {
+      for (var i = 0; i < props.length; i++) {
+        var descriptor = props[i];
+        descriptor.enumerable = descriptor.enumerable || false;
+        descriptor.configurable = true;
+        if ("value" in descriptor) descriptor.writable = true;
+        Object.defineProperty(target, descriptor.key, descriptor);
+      }
+    }
+
+    function _createClass(Constructor, protoProps, staticProps) {
+      if (protoProps) _defineProperties(Constructor.prototype, protoProps);
+      if (staticProps) _defineProperties(Constructor, staticProps);
+      return Constructor;
+    }
+
+    function _extends() {
+      _extends = Object.assign || function (target) {
+        for (var i = 1; i < arguments.length; i++) {
+          var source = arguments[i];
+
+          for (var key in source) {
+            if (Object.prototype.hasOwnProperty.call(source, key)) {
+              target[key] = source[key];
+            }
+          }
+        }
+
+        return target;
+      };
+
+      return _extends.apply(this, arguments);
+    }
+
+    function _inheritsLoose(subClass, superClass) {
+      subClass.prototype = Object.create(superClass.prototype);
+      subClass.prototype.constructor = subClass;
+      subClass.__proto__ = superClass;
+    }
+
+    var BaseSyntax = function () {
+      function BaseSyntax(name) {
         this.name = name;
         this.inlinesInterpreted = true;
         this.blocksInterpreted = true;
         this.isLink = false;
       }
 
-      _createClass(BaseSyntax, [{
-        key: "isEncodable",
-        value: function isEncodable(str) {
-          return true;
-        }
-      }, {
-        key: "wouldBeUnaltered",
-        value: function wouldBeUnaltered(str) {
-          return true;
-        }
-      }]);
+      var _proto = BaseSyntax.prototype;
+
+      _proto.isEncodable = function isEncodable(str) {
+        return true;
+      };
+
+      _proto.wouldBeUnaltered = function wouldBeUnaltered(str) {
+        return true;
+      };
 
       return BaseSyntax;
     }();
 
     var NAME = 'text';
 
-    var TextSyntax = /*#__PURE__*/function (_BaseSyntax) {
-      _inherits(TextSyntax, _BaseSyntax);
-
-      var _super = _createSuper(TextSyntax);
+    var TextSyntax = function (_BaseSyntax) {
+      _inheritsLoose(TextSyntax, _BaseSyntax);
 
       function TextSyntax() {
-        _classCallCheck(this, TextSyntax);
-
-        return _super.call(this, NAME);
+        return _BaseSyntax.call(this, NAME) || this;
       }
 
       _createClass(TextSyntax, null, [{
@@ -1943,17 +1634,13 @@
 
     var NAME$1 = 'linkDestination';
 
-    var LinkDestinationSyntax = /*#__PURE__*/function (_BaseSyntax) {
-      _inherits(LinkDestinationSyntax, _BaseSyntax);
-
-      var _super = _createSuper(LinkDestinationSyntax);
+    var LinkDestinationSyntax = function (_BaseSyntax) {
+      _inheritsLoose(LinkDestinationSyntax, _BaseSyntax);
 
       function LinkDestinationSyntax() {
         var _this;
 
-        _classCallCheck(this, LinkDestinationSyntax);
-
-        _this = _super.call(this, NAME$1);
+        _this = _BaseSyntax.call(this, NAME$1) || this;
         _this.isLink = true;
         _this.inlinesInterpreted = false;
         _this.blocksInterpreted = false;
@@ -1972,17 +1659,13 @@
 
     var NAME$2 = 'linkTitle';
 
-    var LinkTitleSyntax = /*#__PURE__*/function (_BaseSyntax) {
-      _inherits(LinkTitleSyntax, _BaseSyntax);
-
-      var _super = _createSuper(LinkTitleSyntax);
+    var LinkTitleSyntax = function (_BaseSyntax) {
+      _inheritsLoose(LinkTitleSyntax, _BaseSyntax);
 
       function LinkTitleSyntax() {
         var _this;
 
-        _classCallCheck(this, LinkTitleSyntax);
-
-        _this = _super.call(this, NAME$2);
+        _this = _BaseSyntax.call(this, NAME$2) || this;
         _this.isLink = true;
         _this.inlinesInterpreted = false;
         return _this;
@@ -2007,38 +1690,33 @@
     var entityAmpersandsRe = new RegExp(entityAmpersandReStr, 'g');
 
     var NAME$3 = 'cmAutolink';
-    var STARTS_WITH_AUTOLINKED_SCHEME_RE = new RegExp("^".concat(autolinkedSchemeReStr)); // adapted from the non-normative regex in the HTML5 spec
-
+    var STARTS_WITH_AUTOLINKED_SCHEME_RE = new RegExp("^" + autolinkedSchemeReStr);
     var EMAIL_ADDRESS_RE = /^[\w.!#$%&'*+/=?^`{|}~-]+@[a-z\d](?:[a-z\d-]{0,61}[a-z\d])?(?:\.[a-z\d](?:[a-z\d-]{0,61}[a-z\d])?)*$/i;
 
-    var CmAutolinkSyntax = /*#__PURE__*/function (_BaseSyntax) {
-      _inherits(CmAutolinkSyntax, _BaseSyntax);
-
-      var _super = _createSuper(CmAutolinkSyntax);
+    var CmAutolinkSyntax = function (_BaseSyntax) {
+      _inheritsLoose(CmAutolinkSyntax, _BaseSyntax);
 
       function CmAutolinkSyntax() {
         var _this;
 
-        _classCallCheck(this, CmAutolinkSyntax);
-
-        _this = _super.call(this, NAME$3);
+        _this = _BaseSyntax.call(this, NAME$3) || this;
         _this.isLink = true;
         _this.inlinesInterpreted = false;
         _this.blocksInterpreted = false;
         return _this;
       }
 
-      _createClass(CmAutolinkSyntax, [{
-        key: "isEncodable",
-        value: function isEncodable(str) {
-          return STARTS_WITH_AUTOLINKED_SCHEME_RE.test(str) || EMAIL_ADDRESS_RE.test(str);
-        }
-      }, {
-        key: "wouldBeUnaltered",
-        value: function wouldBeUnaltered(str) {
-          return !linkForbiddenRe.test(str) && !entityAmpersandRe.test(str);
-        }
-      }], [{
+      var _proto = CmAutolinkSyntax.prototype;
+
+      _proto.isEncodable = function isEncodable(str) {
+        return STARTS_WITH_AUTOLINKED_SCHEME_RE.test(str) || EMAIL_ADDRESS_RE.test(str);
+      };
+
+      _proto.wouldBeUnaltered = function wouldBeUnaltered(str) {
+        return !linkForbiddenRe.test(str) && !entityAmpersandRe.test(str);
+      };
+
+      _createClass(CmAutolinkSyntax, null, [{
         key: "name",
         get: function get() {
           return NAME$3;
@@ -2050,28 +1728,25 @@
 
     var NAME$4 = 'codeSpan';
 
-    var CodeSpanSyntax = /*#__PURE__*/function (_BaseSyntax) {
-      _inherits(CodeSpanSyntax, _BaseSyntax);
-
-      var _super = _createSuper(CodeSpanSyntax);
+    var CodeSpanSyntax = function (_BaseSyntax) {
+      _inheritsLoose(CodeSpanSyntax, _BaseSyntax);
 
       function CodeSpanSyntax() {
         var _this;
 
-        _classCallCheck(this, CodeSpanSyntax);
-
-        _this = _super.call(this, NAME$4);
+        _this = _BaseSyntax.call(this, NAME$4) || this;
         _this.inlinesInterpreted = false;
         _this.blocksInterpreted = false;
         return _this;
       }
 
-      _createClass(CodeSpanSyntax, [{
-        key: "isEncodable",
-        value: function isEncodable(str) {
-          return str.length > 0;
-        }
-      }], [{
+      var _proto = CodeSpanSyntax.prototype;
+
+      _proto.isEncodable = function isEncodable(str) {
+        return str.length > 0;
+      };
+
+      _createClass(CodeSpanSyntax, null, [{
         key: "name",
         get: function get() {
           return NAME$4;
@@ -2082,10 +1757,6 @@
     }(BaseSyntax);
 
     var Syntax = BaseSyntax;
-    /**
-     * GFM syntaxes used within {@link gfmSetupDefault}.
-     */
-
     Syntax.text = new TextSyntax();
     Syntax.linkDestination = new LinkDestinationSyntax();
     Syntax.linkTitle = new LinkTitleSyntax();
@@ -2112,33 +1783,19 @@
       var x = this.metadata;
       var before = x.extraBacktickString + x.extraSpace;
       var after = x.extraSpace + x.extraBacktickString;
-      return "".concat(before).concat(output).concat(after);
+      return "" + before + output + after;
     }
-    /**
-     * Adjust leading and trailing code span part according to contets and
-     * set metadata.
-     */
-
 
     function codeSpanReplace() {
       this.preprocessors.push(scanDelimiters);
       this.postprocessors.unshift(addDelimiterExtras);
     }
 
-    var BACKSLASH_BLOCK_RE = new RegExp([// thematic code block or `-` setext heading
-    '^([-*_])[ \\t]*(?:\\1[ \\t]*){2,}$', // `=` setext heading
-    '^=+[ \\t]*$', // list item or ATX heading
-    '^(?:[-+*]|#{1,6})(?=\\s|$)', // `~` fenced code block (the rest is left for inline tilde escaping)
-    '^~(?=~~)'].join('|')); // $1: number, $2: marker character
-
+    var BACKSLASH_BLOCK_RE = new RegExp(['^([-*_])[ \\t]*(?:\\1[ \\t]*){2,}$', '^=+[ \\t]*$', '^(?:[-+*]|#{1,6})(?=\\s|$)', '^~(?=~~)'].join('|'));
     var ORDERED_LIST_RE = /^(\d+)([.)])(?=\s|$)/;
-    /**
-     * Escape block syntax.
-     */
-
     function blockReplace() {
-      this.replacer.addReplacement(BACKSLASH_BLOCK_RE, '\\$&');
-      this.replacer.addReplacement(ORDERED_LIST_RE, '$1\\$2');
+      this.replaces.push([BACKSLASH_BLOCK_RE, '\\$&']);
+      this.replaces.push([ORDERED_LIST_RE, '$1\\$2']);
     }
 
     function mergeOpts(opts, key, defaults, defaultEnabled) {
@@ -2147,43 +1804,35 @@
       if (!myOpts && (!defaultEnabled || myOpts !== undefined)) {
         return false;
       }
-      /* eslint-disable-next-line no-param-reassign */
 
-
-      opts[key] = _typeof(opts[key]) === 'object' ? _objectSpread2(_objectSpread2({}, defaults), opts[key]) : defaults;
+      opts[key] = typeof opts[key] === 'object' ? _extends({}, defaults, opts[key]) : defaults;
       return true;
     }
 
-    // www is case sensitive
     var autolinkedWwwReStr = 'www\\.';
 
-    var extWebAutolinkStartCandidateReStr = "(?:".concat(autolinkedSchemeReStr, "|").concat(autolinkedWwwReStr, ")") + '[^\\s\x21-\x2F\x3A-\x40\x5B-\x60\x7B-\x7E]';
+    var extWebAutolinkStartCandidateReStr = "(?:" + autolinkedSchemeReStr + "|" + autolinkedWwwReStr + ")" + '[^\\s\x21-\x2F\x3A-\x40\x5B-\x60\x7B-\x7E]';
 
     var defaultOpts = {
       maxIntrawordUnderscoreRun: undefined
     };
-    var INTRAWORD_UNDERSORES_RE = new RegExp("([a-zA-Z0-9])(_+)(?=[a-zA-Z0-9])(?!".concat(extWebAutolinkStartCandidateReStr, ")"));
+    var INTRAWORD_UNDERSORES_RE = new RegExp("([a-zA-Z0-9])(_+)(?=[a-zA-Z0-9])(?!" + extWebAutolinkStartCandidateReStr + ")");
     var FREE_DELIMITER_RE = /(?:^|[ \t\f])([_*])\1*(?=[ \t\r\n\f])/;
 
     function processIntrawordUnderscores(_ref) {
-      var _ref$match = _slicedToArray(_ref.match, 3),
+      var _ref$match = _ref.match,
           m = _ref$match[0],
           before = _ref$match[1],
           underscores = _ref$match[2];
-
       var max = this.escape.opts.emphasisNonDelimiters.maxIntrawordUnderscoreRun;
 
       if (max !== false && underscores.length > max) {
         var underscoresOut = underscores.replace(/_/g, '\\_');
-        return "".concat(before).concat(underscoresOut);
+        return "" + before + underscoresOut;
       }
 
       return m;
     }
-    /**
-     * Keep `*` and `_` unescaped when we know they cannot form emphasis delimiters.
-     */
-
 
     function emphasisNonDelimitersReplace() {
       if (!mergeOpts(this.opts, 'emphasisNonDelimiters', defaultOpts, true)) {
@@ -2196,27 +1845,16 @@
         this.opts.emphasisNonDelimiters.maxIntrawordUnderscoreRun = max ? 1 : false;
       }
 
-      this.replacer.addReplacement(INTRAWORD_UNDERSORES_RE, processIntrawordUnderscores, true);
-      this.replacer.addReplacement(FREE_DELIMITER_RE, '$&');
+      this.replaces.push([INTRAWORD_UNDERSORES_RE, processIntrawordUnderscores, true]);
+      this.replaces.push([FREE_DELIMITER_RE, '$&']);
     }
-
-    /**
-     * Backslash-escape entity ampersand'. To be used when backslash escape
-     * is not an option, i.e. in CM autolinks.
-     */
 
     function entityBackslashReplace() {
-      this.replacer.addReplacement(entityAmpersandRe, '\\&');
+      this.replaces.push([entityAmpersandRe, '\\&']);
     }
 
-    /**
-     * Escape entity ampersand with '&amp;'. To be used when backslash escape
-     * is not an option, i.e. in CM autolinks. But also for link destinations,
-     * see cmark_gfm-005.
-     */
-
     function entityEntityReplace() {
-      this.replacer.addReplacement(entityAmpersandRe, '&amp;');
+      this.replaces.push([entityAmpersandRe, '&amp;']);
     }
 
     var C = {
@@ -2470,22 +2108,12 @@
       var ent = ALPHA_ENTITY_REFERENCES[c];
 
       if (ent) {
-        return "&".concat(ent, ";");
+        return "&" + ent + ";";
       }
 
       return null;
     }
 
-    /**
-     * TODO: doc
-     * @param {String} tildes
-     * @param {Function} charEscape
-     * @param {number} offset
-     * @param {String} string
-     * @param {Object} ctx
-     * @param {Object} opts
-     * @private
-     */
     function escapeTildes(tildes, offset, string, ctx, opts) {
       if (!opts.strikethrough) {
         return tildes;
@@ -2493,9 +2121,7 @@
 
       if (!opts.strikethrough.optimizeForDoubleTilde) {
         return tildes.replace(/./g, '\\$&');
-      } // An unescaped leading or trailing tilde can break a surrounding strike-through.
-      // This could be smarter if such context information were caller-supplied.
-
+      }
 
       var atStart = (!ctx || ctx.atStart) && offset === 0;
       var atEnd = (!ctx || ctx.atEnd) && offset + tildes.length >= string.length;
@@ -2504,223 +2130,185 @@
       var trail = '';
 
       if (atStart && mid.length > 0) {
-        lead = "\\".concat(mid.charAt(0));
+        lead = "\\" + mid.charAt(0);
         mid = mid.substring(1);
       }
 
       if (atEnd && mid.length > 0) {
-        trail = "\\".concat(mid.charAt(mid.length - 1));
+        trail = "\\" + mid.charAt(mid.length - 1);
         mid = mid.slice(0, -1);
       }
 
       if (mid.length === 2) {
-        mid = "\\".concat(mid.charAt(0)).concat(mid.substring(1));
+        mid = "\\" + mid.charAt(0) + mid.substring(1);
       }
 
-      return "".concat(lead).concat(mid).concat(trail);
+      return "" + lead + mid + trail;
     }
 
-    var LINK_ESCAPE_RE = new RegExp("([_*<>[\\]]|".concat(entityAmpersandReStr, ")|(~+)"), 'g');
+    var LINK_ESCAPE_RE = new RegExp("([_*<>[\\]]|" + entityAmpersandReStr + ")|(~+)", 'g');
 
-    var ExtWebAutolinkTransformers = /*#__PURE__*/function () {
+    var ExtWebAutolinkTransformers = function () {
       function ExtWebAutolinkTransformers(ctx, opts) {
-        _classCallCheck(this, ExtWebAutolinkTransformers);
-
         this.ctx = ctx;
         this.opts = opts;
       }
-      /* eslint-disable-next-line class-methods-use-this */
 
+      var _proto = ExtWebAutolinkTransformers.prototype;
 
-      _createClass(ExtWebAutolinkTransformers, [{
-        key: "keep",
-        value: function keep(link, trail) {
-          return "".concat(link).concat(trail);
-        }
-      }, {
-        key: "commonmark",
-        value: function commonmark(link, trail) {
-          // unlike backslash escapes, entity-like sequences are interpreted
-          var outLink = link.replace(entityAmpersandsRe, '&amp;');
-          var addScheme = this.ctx.scheme ? '' : 'http://'; // Give the trail back to matching
+      _proto.keep = function keep(link, trail) {
+        return "" + link + trail;
+      };
 
-          this.ctx.mctx.skip(-trail.length);
-          return "<".concat(addScheme).concat(outLink, ">");
-        }
-      }, {
-        key: "entities",
-        value: function entities(link) {
-          return "".concat(link).concat(this.ctx.entityEncodedTrail);
-        }
-      }, {
-        key: "breakup",
-        value: function breakup(link, trail) {
-          this.ctx.unterminatedEntity = false;
-          var giveBack = link.length - this.ctx.linkStart.length + trail.length;
-          this.ctx.mctx.skip(-giveBack);
-          return "".concat(this.ctx.linkStart).concat(this.opts.extAutolink.breaker);
-        }
-      }, {
-        key: "breakafter",
-        value: function breakafter(link, trail) {
-          this.ctx.unterminatedEntity = false; // Give the trail back to matching
+      _proto.commonmark = function commonmark(link, trail) {
+        var outLink = link.replace(entityAmpersandsRe, '&amp;');
+        var addScheme = this.ctx.scheme ? '' : 'http://';
+        this.ctx.mctx.skip(-trail.length);
+        return "<" + addScheme + outLink + ">";
+      };
 
-          this.ctx.mctx.skip(-trail.length);
-          return "".concat(link).concat(this.opts.extAutolink.breaker);
-        }
-        /**
-         * Escape characters in extended web autolink match according to the callers settings,
-         * so that it is interpreted correctly in GFM.
-         * @param {String} str Link match portion to be escaped.
-         * @private
-         */
+      _proto.entities = function entities(link) {
+        return "" + link + this.ctx.entityEncodedTrail;
+      };
 
-      }, {
-        key: "backslashEscape",
-        value: function backslashEscape(str) {
-          var _this = this;
+      _proto.breakup = function breakup(link, trail) {
+        this.ctx.unterminatedEntity = false;
+        var giveBack = link.length - this.ctx.linkStart.length + trail.length;
+        this.ctx.mctx.skip(-giveBack);
+        return "" + this.ctx.linkStart + this.opts.extAutolink.breaker;
+      };
 
-          return str.replace(LINK_ESCAPE_RE, function (m, single, tildes, offset, string) {
-            if (single) {
-              return "\\".concat(single);
-            }
+      _proto.breakafter = function breakafter(link, trail) {
+        this.ctx.unterminatedEntity = false;
+        this.ctx.mctx.skip(-trail.length);
+        return "" + link + this.opts.extAutolink.breaker;
+      };
 
-            if (tildes) {
-              return escapeTildes(tildes, offset, string, _this.ctx, _this.opts);
-            }
+      _proto.backslashEscape = function backslashEscape(str) {
+        var _this = this;
 
-            return m;
-          });
-        }
-      }]);
+        return str.replace(LINK_ESCAPE_RE, function (m, single, tildes, offset, string) {
+          if (single) {
+            return "\\" + single;
+          }
+
+          if (tildes) {
+            return escapeTildes(tildes, offset, string, _this.ctx, _this.opts);
+          }
+
+          return m;
+        });
+      };
 
       return ExtWebAutolinkTransformers;
     }();
 
     var ENT_ENC_RE = /(^;)|([<>])|([()])|([^?!.,:"'])/g;
 
-    var ExtWebAutolinkRenderer = /*#__PURE__*/function () {
+    var ExtWebAutolinkRenderer = function () {
       function ExtWebAutolinkRenderer(link, trail, ctx, opts) {
-        _classCallCheck(this, ExtWebAutolinkRenderer);
-
         this.link = link;
         this.trail = trail;
         this.ctx = ctx;
-        this.opts = opts; // See cmark_gfm-004
-
+        this.opts = opts;
         this.ctx.wouldConfuseEntity = trail.startsWith(';') && /&[a-z]+$/i.test(link);
       }
-      /**
-       * Pick an appropriate autolink match transformer based on trailing
-       * punctuation and user configuration.
-       * @returns {Function} Picked tranformer function.
-       * @private
-       */
 
+      var _proto = ExtWebAutolinkRenderer.prototype;
 
-      _createClass(ExtWebAutolinkRenderer, [{
-        key: "pickTransformer",
-        value: function pickTransformer(t) {
-          var _this = this;
+      _proto.pickTransformer = function pickTransformer(t) {
+        var _this = this;
 
-          if (this.ctx.scheme && this.opts.extAutolink.breakUrl) {
-            return t.breakup;
+        if (this.ctx.scheme && this.opts.extAutolink.breakUrl) {
+          return t.breakup;
+        }
+
+        if (this.ctx.www && this.opts.extAutolink.breakWww) {
+          return t.breakup;
+        }
+
+        if (!this.ctx.forceDelimiting && !this.ctx.wouldConfuseEntity) {
+          this.ctx.backslashEscapedTrail = t.backslashEscape(this.trail);
+
+          if (this.ctx.backslashEscapedTrail === this.trail) {
+            return t.keep;
           }
+        }
 
-          if (this.ctx.www && this.opts.extAutolink.breakWww) {
-            return t.breakup;
-          }
+        var allowed = {
+          breakup: true,
+          breakafter: true
+        };
+        var considered = {};
 
-          if (!this.ctx.forceDelimiting && !this.ctx.wouldConfuseEntity) {
-            this.ctx.backslashEscapedTrail = t.backslashEscape(this.trail);
+        if (this.ctx.scheme || this.opts.extAutolink.allowAddHttpScheme) {
+          allowed.commonmark = !linkForbiddenRe.test(this.link);
+        }
 
-            if (this.ctx.backslashEscapedTrail === this.trail) {
-              return t.keep;
-            }
-          }
-
-          var allowed = {
-            breakup: true,
-            breakafter: true
+        if (!this.ctx.forceDelimiting && !/[~a-z0-9]/i.test(this.trail)) {
+          considered.entities = function () {
+            return _this.tryEntityEncodeTrail();
           };
-          var considered = {};
-
-          if (this.ctx.scheme || this.opts.extAutolink.allowAddHttpScheme) {
-            // see cmark_gfm-002
-            allowed.commonmark = !linkForbiddenRe.test(this.link);
-          }
-
-          if (!this.ctx.forceDelimiting && !/[~a-z0-9]/i.test(this.trail)) {
-            // only consider when there are no chars known to be unconvertible to entity references
-            // but delay full evaluation
-            considered.entities = function () {
-              return _this.tryEntityEncodeTrail();
-            };
-          }
-
-          for (var i = 0; i < this.opts.extAutolink.allowedTransformations.length; i++) {
-            var picked = this.opts.extAutolink.allowedTransformations[i];
-
-            if (allowed[picked]) {
-              return t[picked];
-            }
-
-            if (considered[picked] && considered[picked]()) {
-              return t[picked];
-            }
-          }
-
-          return t.breakafter;
         }
-      }, {
-        key: "tryEntityEncodeTrail",
-        value: function tryEntityEncodeTrail() {
-          var _this2 = this;
 
-          var encodePar = false;
-          var success = true;
-          var enc = this.trail.replace(ENT_ENC_RE, function (m, semi, angle, par, other) {
-            if (semi) {
-              return _this2.ctx.wouldConfuseEntity ? toAlphaEntityReference(semi) : semi;
-            }
+        for (var i = 0; i < this.opts.extAutolink.allowedTransformations.length; i++) {
+          var picked = this.opts.extAutolink.allowedTransformations[i];
 
-            if (angle) {
-              // angle brackets break the link, we must enforce all contextually dependent
-              // link characters to be encoded - which is: parentheses
-              encodePar = true;
-              return toAlphaEntityReference(angle);
-            }
-
-            if (par) {
-              return encodePar ? toAlphaEntityReference(par) : par;
-            }
-
-            if (other) {
-              var entref = toAlphaEntityReference(other);
-
-              if (entref) {
-                return entref;
-              }
-
-              success = false;
-            }
-
-            return m;
-          });
-
-          if (success) {
-            this.ctx.entityEncodedTrail = enc;
+          if (allowed[picked]) {
+            return t[picked];
           }
 
-          return success;
+          if (considered[picked] && considered[picked]()) {
+            return t[picked];
+          }
         }
-      }, {
-        key: "render",
-        value: function render() {
-          var t = new ExtWebAutolinkTransformers(this.ctx, this.opts);
-          return this.pickTransformer(t).call(t, this.link, this.trail);
+
+        return t.breakafter;
+      };
+
+      _proto.tryEntityEncodeTrail = function tryEntityEncodeTrail() {
+        var _this2 = this;
+
+        var encodePar = false;
+        var success = true;
+        var enc = this.trail.replace(ENT_ENC_RE, function (m, semi, angle, par, other) {
+          if (semi) {
+            return _this2.ctx.wouldConfuseEntity ? toAlphaEntityReference(semi) : semi;
+          }
+
+          if (angle) {
+            encodePar = true;
+            return toAlphaEntityReference(angle);
+          }
+
+          if (par) {
+            return encodePar ? toAlphaEntityReference(par) : par;
+          }
+
+          if (other) {
+            var entref = toAlphaEntityReference(other);
+
+            if (entref) {
+              return entref;
+            }
+
+            success = false;
+          }
+
+          return m;
+        });
+
+        if (success) {
+          this.ctx.entityEncodedTrail = enc;
         }
-      }]);
+
+        return success;
+      };
+
+      _proto.render = function render() {
+        var t = new ExtWebAutolinkTransformers(this.ctx, this.opts);
+        return this.pickTransformer(t).call(t, this.link, this.trail);
+      };
 
       return ExtWebAutolinkRenderer;
     }();
@@ -2731,7 +2319,6 @@
 
     function wrapPostprocessor(processFn, postProcessFn) {
       return function wrapper() {
-        // eslint-disable-next-line prefer-rest-params
         return postProcessFn.call(this, processFn.apply(this, arguments));
       };
     }
@@ -2743,55 +2330,41 @@
       allowedTransformations: ['entities', 'commonmark'],
       allowAddHttpScheme: false,
       inImage: false
-    }); // true if autolink match should be considered autolink in given matching context
+    });
 
     var shouldProcess = function shouldProcess(_ref) {
       var gfmContext = _ref.gfmContext,
           opts = _ref.escape.opts;
       return !gfmContext.inLink && (!gfmContext.inImage || opts.autolink.inImage);
-    }; // $1: before, $2: linkMatch, $3: linkStart, $4: scheme, $5: www.
-
+    };
 
     var EXT_WEB_AUTOLINK_RE = function () {
-      // Standard domain character match
-      var MC_SD = "[^".concat(C.space).concat(C.punct, "]");
-      var MC_D3 = "(?:".concat(MC_SD, "|[-_])"); // 3rd+ level domain char
-
-      var MC_D12 = "(?:".concat(MC_SD, "|-)"); // 1st and 2nd level domain char
-      // see cmark_gfm-003
-
-      var M_D = "(?![-_.<>])(?:(?:".concat(MC_D3, "*\\.)*").concat(MC_D12, "*\\.)?").concat(MC_D12, "*(?!").concat(MC_D3, ")"); // see cmark_gfm-002
-
-      var MC_AFTER_D = '[^ \\t\\n\\r]'; // after-domain char including '<' for our purposes
-
+      var MC_SD = "[^" + C.space + C.punct + "]";
+      var MC_D3 = "(?:" + MC_SD + "|[-_])";
+      var MC_D12 = "(?:" + MC_SD + "|-)";
+      var M_D = "(?![-_.<>])(?:(?:" + MC_D3 + "*\\.)*" + MC_D12 + "*\\.)?" + MC_D12 + "*(?!" + MC_D3 + ")";
+      var MC_AFTER_D = '[^ \\t\\n\\r]';
       var M_URL = autolinkedSchemeReStr;
-      var M_WWW = autolinkedWwwReStr; // see cmark_gfm-001
-
-      var M_BEFORE = "(?:\\b|_)(?=".concat(M_URL, ")|(?:^|[").concat(C.space, "*_(]|~+)(?=").concat(M_WWW, ")");
-      return new RegExp("(".concat(M_BEFORE, ")(((").concat(M_URL, ")|(").concat(M_WWW, "))").concat(M_D).concat(MC_AFTER_D, "*)"));
+      var M_WWW = autolinkedWwwReStr;
+      var M_BEFORE = "(?:\\b|_)(?=" + M_URL + ")|(?:^|[" + C.space + "*_(]|~+)(?=" + M_WWW + ")";
+      return new RegExp("(" + M_BEFORE + ")(((" + M_URL + ")|(" + M_WWW + "))" + M_D + MC_AFTER_D + "*)");
     }();
 
     var EXT_EMAIL_AUTOLINK_RE = /[-+.\w]+@(?:[-\w]+\.)+[-\w]*[^\W_](?![-@\w])/;
-    /**
-     * Process extended web autolink-like sequence in a plain text input.
-     * @param {MatchingContext} mctx matching context.
-     * @private
-     */
 
     function processExtWebAutolink(mctx) {
-      var _mctx$match = _slicedToArray(mctx.match, 6),
+      var _mctx$match = mctx.match,
           m = _mctx$match[0],
           before = _mctx$match[1],
           linkMatch = _mctx$match[2],
           linkStart = _mctx$match[3],
           scheme = _mctx$match[4],
           www = _mctx$match[5];
-
-      var outBefore = before ? "\\".concat(before) : '';
+      var outBefore = before ? "\\" + before : '';
 
       if (!shouldProcess(this)) {
         mctx.jump(before.length + linkStart.length);
-        return "".concat(outBefore).concat(linkStart);
+        return "" + outBefore + linkStart;
       }
 
       var trail = '';
@@ -2803,18 +2376,15 @@
         link = link.substring(0, linkEnd);
       }
 
-      var forceDelimiting = false; // forcefully terminated link can be followed by other links
-      // consider only longer trails, as min. match would be like '<a@b.c'
+      var forceDelimiting = false;
 
       if (trail.length >= 6) {
         forceDelimiting = EXT_EMAIL_AUTOLINK_RE.test(trail) || EXT_WEB_AUTOLINK_RE.test(trail);
-      } // Trailing punctuation and ')'
-
+      }
 
       linkEnd = link.search(/[?!.,:*_~'";)]+$/i);
 
       if (linkEnd >= 0) {
-        // treat matching ')' as part of the link
         var popen = 0;
         var pclose = 0;
 
@@ -2848,52 +2418,40 @@
         forceDelimiting: forceDelimiting
       };
       var renderer = new ExtWebAutolinkRenderer(link, trail, ctx, this.escape.opts);
-      return "".concat(outBefore).concat(renderer.render());
-    } // $1: keep
-
+      return "" + outBefore + renderer.render();
+    }
 
     var GFM_EMAIL_UNDERSCORES_RE = /([a-z\d]_+)(?=[a-z\d])|_/gi;
 
     function processExtEmailAutolink(mctx) {
-      var _mctx$match2 = _slicedToArray(mctx.match, 1),
+      var _mctx$match2 = mctx.match,
           emailMatch = _mctx$match2[0];
 
       if (!shouldProcess(this)) {
         var emailShred = emailMatch.match(/^.*?@/)[0];
         mctx.jump(emailShred.length);
         return this.escape.escape(emailShred, this.gfmContext, this.metadata);
-      } // Thankfuly backlashs escapes are OK within extended email autolinks,
-      // since only strictly intraword underscores are safe to keep.
-
+      }
 
       return emailMatch.replace(GFM_EMAIL_UNDERSCORES_RE, function (m, keep) {
-        return keep ? m : "\\".concat(m);
+        return keep ? m : "\\" + m;
       });
     }
-    /**
-     * Apply extended autolink replaces according to escaper's configuration.
-     */
-
 
     function extAutolinkReplace() {
       if (!mergeOpts(this.opts, 'extAutolink', defaultOpts$1)) {
         return;
       }
 
-      this.replacer.addReplacement(EXT_WEB_AUTOLINK_RE, wrapPostprocessor(processExtWebAutolink, escapePipesIfInTable), true);
-      this.replacer.addReplacement(EXT_EMAIL_AUTOLINK_RE, processExtEmailAutolink, true);
+      this.replaces.push([EXT_WEB_AUTOLINK_RE, wrapPostprocessor(processExtWebAutolink, escapePipesIfInTable), true]);
+      this.replaces.push([EXT_EMAIL_AUTOLINK_RE, processExtEmailAutolink, true]);
     }
 
-    var INLINE_RE = new RegExp(['[*_[\\]`<>]', '\\\\(?=[-!"#$%&\'()*+,./:;<=>?@\\[\\\\\\]^_`{|}~]|$)', entityAmpersandReStr].join('|')); // $1: hard line break marker
-
+    var INLINE_RE = new RegExp(['[*_[\\]`<>]', '\\\\(?=[-!"#$%&\'()*+,./:;<=>?@\\[\\\\\\]^_`{|}~]|$)', entityAmpersandReStr].join('|'));
     var HARD_LINE_BREAK_RE = /([ ]{2})$/;
-    /**
-     * Escape inlines that are necessary to be escaped.
-     */
-
     function inlineReplace() {
-      this.replacer.addReplacement(INLINE_RE, '\\$&');
-      this.replacer.addReplacement(HARD_LINE_BREAK_RE, '$1<!-- spaces -->');
+      this.replaces.push([INLINE_RE, '\\$&']);
+      this.replaces.push([HARD_LINE_BREAK_RE, '$1<!-- spaces -->']);
     }
 
     var LINK_DESTINATION_SPECIALS_RE = /[()<>]/;
@@ -2901,29 +2459,19 @@
     function renderEmptyLinkDestination(output) {
       return output.length > 0 ? output : '<>';
     }
-    /**
-     * Escape parentheses and brackets.
-     */
-
 
     function linkDestinationReplace() {
-      this.replacer.addReplacement(LINK_DESTINATION_SPECIALS_RE, '\\$&');
+      this.replaces.push([LINK_DESTINATION_SPECIALS_RE, '\\$&']);
       this.postprocessors.unshift(renderEmptyLinkDestination);
     }
 
     function processLink(_ref) {
-      var _ref2 = _slicedToArray(_ref, 1),
-          m = _ref2[0];
-
+      var m = _ref[0];
       return encodeURIComponent(m);
     }
-    /**
-     * Escape parentheses <, > and whitespace either as entites or in URL encoding.
-     */
-
 
     function linkReplace() {
-      this.replacer.addReplacement(linkForbiddenRe, processLink);
+      this.replaces.push([linkForbiddenRe, processLink]);
     }
 
     var DOUBLE_Q = '"';
@@ -2996,19 +2544,15 @@
     }
 
     function processLinkTitleDelim(_ref) {
-      var _ref$match = _slicedToArray(_ref.match, 1),
+      var _ref$match = _ref.match,
           c = _ref$match[0];
 
       if (this.linkTitleEscapedDelimiters[charDelims[c]]) {
-        return "\\".concat(c);
+        return "\\" + c;
       }
 
       return c;
     }
-    /**
-     * Escape parentheses.
-     */
-
 
     function linkTitleReplace() {
       if (!mergeOpts(this.opts, 'linkTitle', defaultOpts$2, true)) {
@@ -3016,7 +2560,7 @@
       }
 
       this.preprocessors.push(scanDelimiters$1);
-      this.replacer.addReplacement(LINK_TITLE_DELIMS_RE, processLinkTitleDelim, true);
+      this.replaces.push([LINK_TITLE_DELIMS_RE, processLinkTitleDelim, true]);
     }
 
     var defaultOpts$3 = Object.freeze({
@@ -3028,60 +2572,47 @@
       var match = _ref.match;
       return escapeTildes(match[0], match.index, match.input, null, this.escape.opts);
     }
-    /**
-     * Apply autolink replaces according to escaper's configuration.
-     */
-
 
     function strikethroughReplace() {
       if (!mergeOpts(this.opts, 'strikethrough', defaultOpts$3)) {
         return;
       }
 
-      this.replacer.addReplacement(STRIKETHROUGH_RE, processStrikethrough, true);
+      this.replaces.push([STRIKETHROUGH_RE, processStrikethrough, true]);
     }
 
     var defaultOpts$4 = true;
 
     var TABLE_DELIMITER_ROW_RE = function () {
       var SP = '[ \\t]*';
-      var CELL = "".concat(SP, ":?-+:?").concat(SP);
+      var CELL = SP + ":?-+:?" + SP;
       var P = '[|]';
-      var L_OR_BOTH = "".concat(SP, "(?:").concat(P).concat(CELL, ")+").concat(P, "?");
-      var R_OR_NONE = "".concat(CELL, "(?=").concat(P, ")(?:").concat(P).concat(CELL, ")*").concat(P, "?");
-      return new RegExp("^(?:".concat(L_OR_BOTH, "|").concat(R_OR_NONE, ")").concat(SP, "$"));
+      var L_OR_BOTH = SP + "(?:" + P + CELL + ")+" + P + "?";
+      var R_OR_NONE = CELL + "(?=" + P + ")(?:" + P + CELL + ")*" + P + "?";
+      return new RegExp("^(?:" + L_OR_BOTH + "|" + R_OR_NONE + ")" + SP + "$");
     }();
 
     function processTableDelimiterRow(_ref) {
-      var _ref$match = _slicedToArray(_ref.match, 1),
+      var _ref$match = _ref.match,
           delimiterRow = _ref$match[0];
-
       return delimiterRow.replace(/\|/g, '\\|');
     }
-    /**
-     * Escape table delimiter row.
-     */
-
 
     function tableDelimiterRowReplace() {
       if (!mergeOpts(this.opts, 'table', defaultOpts$4)) {
         return;
       }
 
-      this.replacer.addReplacement(TABLE_DELIMITER_ROW_RE, processTableDelimiterRow, true);
+      this.replaces.push([TABLE_DELIMITER_ROW_RE, processTableDelimiterRow, true]);
     }
 
     var PIPE_RE = /\|/;
-    /**
-     * Escape table pipes if in table context.
-     */
-
     function tablePipeReplace() {
       if (!this.opts.table) {
         return;
       }
 
-      this.replacer.addReplacement(PIPE_RE, escapePipesIfInTable);
+      this.replaces.push([PIPE_RE, escapePipesIfInTable]);
     }
 
     var gfmSetupDefault = function gfmSetupDefault(s) {
@@ -3096,56 +2627,54 @@
       }, input);
     }
 
-    var GfmEscape = /*#__PURE__*/function () {
-      /**
-       * Construct a new escaper based on the specified context, options and setup definition.
-       * The instance is intended to be created once per GFM context and reused.
-       * @param {Object} opts Escaping options for escaper setup and runtime.
-       * @param {GfmEscape.Syntax} syntax The syntax we are escaping for. See {@link Syntax}.
-       * @param {function} setup Callback that returns array of replaces to be applied in the
-       *  for the specified syntax. See {@link GfmEscape.defaultSetup}.
-       */
-      function GfmEscape(opts) {
+    var GfmEscape = function () {
+      function GfmEscape(opts, syntax, setup) {
         var _this = this;
 
-        var syntax = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : Syntax.text;
-        var setup = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : GfmEscape.defaultSetup;
+        if (syntax === void 0) {
+          syntax = Syntax.text;
+        }
 
-        _classCallCheck(this, GfmEscape);
+        if (setup === void 0) {
+          setup = GfmEscape.defaultSetup;
+        }
 
         this.syntax = syntax;
-        this.opts = opts ? _objectSpread2({}, opts) : {};
-        this.replacer = new UnionReplacer('gm');
+        this.opts = opts ? _extends({}, opts) : {};
+        this.replaces = [];
         this.preprocessors = [];
         this.postprocessors = [];
         setup(syntax).forEach(function (_ref) {
-          var _ref2 = _slicedToArray(_ref, 2),
-              replace = _ref2[0],
-              enabled = _ref2[1];
+          var replace = _ref[0],
+              enabled = _ref[1];
 
           if (enabled) {
             replace.call(_this);
           }
         });
-        this.replacer.compile();
-        this.cache = {};
+        this.replacer = new UnionReplacer(this.replaces, 'gm');
       }
 
-      _createClass(GfmEscape, [{
-        key: "escape",
-        value: function escape(input) {
-          var gfmContext = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
-          var metadata = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : {};
-          var escapeCtx = {
-            escape: this,
-            gfmContext: gfmContext,
-            metadata: metadata
-          };
-          var str = applyProcessors.call(escapeCtx, input, this.preprocessors);
-          str = this.replacer.replace(str, escapeCtx);
-          return applyProcessors.call(escapeCtx, str, this.postprocessors);
+      var _proto = GfmEscape.prototype;
+
+      _proto.escape = function escape(input, gfmContext, metadata) {
+        if (gfmContext === void 0) {
+          gfmContext = {};
         }
-      }]);
+
+        if (metadata === void 0) {
+          metadata = {};
+        }
+
+        var escapeCtx = {
+          escape: this,
+          gfmContext: gfmContext,
+          metadata: metadata
+        };
+        var str = applyProcessors.call(escapeCtx, input, this.preprocessors);
+        str = this.replacer.replace(str, escapeCtx);
+        return applyProcessors.call(escapeCtx, str, this.postprocessors);
+      };
 
       return GfmEscape;
     }();
@@ -3161,12 +2690,31 @@
   var arrays = {
     includes: function includes(arr, item) {
       return arr.indexOf(item) >= 0;
+    },
+    equals: function equals(arr1, arr2) {
+      if (arr1.length !== arr2.length) {
+        return false;
+      }
+
+      for (var i = 0; i < arr1.length; i++) {
+        if (arr1[i] !== arr2[i]) {
+          return false;
+        }
+      }
+
+      return true;
     }
   };
 
   var strings = {
     repeat: function repeat(character, count) {
       return Array(count + 1).join(character);
+    },
+    startsWith: function startsWith(str, searchString) {
+      return str.lastIndexOf(searchString, 0) === 0;
+    },
+    endsWith: function endsWith(str, searchString) {
+      return str.indexOf(searchString, str.length - searchString.length) !== -1;
     }
   };
 
@@ -3361,7 +2909,7 @@
   };
 
   function renderMacroArgument(value) {
-    if (value.indexOf(',') >= 0) {
+    if (value && value.indexOf(',') >= 0) {
       var qValue = value.replace(/&(?=[a-zA-Z][a-zA-Z\\d]*;|#\\d{1,7};|#[xX][\\da-fA-F]{1,6};)/g, '&amp;').replace(/"/g, '&quot;');
       return "\"" + qValue + "\"";
     }
@@ -3369,8 +2917,17 @@
     return value;
   }
 
+  function renderMacroBody(content) {
+    if (content) {
+      var value = content.replace(/^\n+/, '').replace(/\n+$/, '');
+      return "\n" + value + "\n";
+    }
+
+    return content;
+  }
+
   function padLeft(node) {
-    if (node.previousSibling && node.previousSibling.nodeType === 3 && node.previousSibling.textContent.endsWith('!')) {
+    if (node.previousSibling && node.previousSibling.nodeType === 3 && strings.endsWith(node.previousSibling.textContent, '!')) {
       return ' ';
     }
 
@@ -3382,11 +2939,8 @@
       macroOpts = {};
     }
 
-    if (content) {
-      throw new Error('Macros accepting block of text not supported');
-    }
-
     var lpad = padLeft(node);
+    var renderedTextBlock = renderMacroBody(content) || '';
     var renderedArgs = macroArgs.map(function (arg) {
       return renderMacroArgument(arg);
     });
@@ -3394,12 +2948,14 @@
       return opt + "=" + renderMacroArgument(macroOpts[opt]);
     });
     var paramStr = renderedArgs.concat(renderedOpts).join(', ');
-    return lpad + "{{" + macro + "(" + paramStr + ")}}";
+    return lpad + "{{" + macro + "(" + paramStr + ")" + renderedTextBlock + "}}";
   }
 
   var macro = {
     renderMacro: renderMacro,
-    padLeft: padLeft
+    padLeft: padLeft,
+    renderMacroBody: renderMacroBody,
+    renderMacroArgument: renderMacroArgument
   };
 
   function delimit(content, delimiter) {
@@ -3552,15 +3108,6 @@
       return "<" + escaped + ">";
     }
   });
-  rules$2.set('text', {
-    filter: '#text',
-    replacement: function replacement(content, node, options) {
-      var escapers = options.escapers,
-          contexts = options.contexts;
-      var text = escapers.escaper('text').escape(node.nodeValue, contexts.forNode(node));
-      return node.isCode ? text : text.trim();
-    }
-  });
   rules$2.set('issue', {
     filter: function filter(node) {
       return node.nodeName === 'A' && node.classList.contains('issue');
@@ -3672,6 +3219,32 @@
     },
     transparent: true
   });
+  rules$2.set('collapseMacroAnchor', {
+    filter: function filter(node) {
+      return node.nodeName === 'A' && node.classList.contains('collapsible') && node.childNodes && node.childNodes.length === 1 && node.firstChild.nodeType === 3;
+    },
+    replacement: function replacement(content, node, options) {
+      var collapseMacros = options.collapseMacros;
+      var id = node.id.match(/collapse-([^-]+)/)[1];
+      var arg = node.firstChild ? node.firstChild.nodeValue : null;
+      collapseMacros.args[id] = _extends({}, collapseMacros.args[id], node.id.match('show') ? {
+        showLabel: arg
+      } : {
+        hideLabel: arg
+      });
+      return '';
+    }
+  });
+  rules$2.set('collapseMacroBody', {
+    filter: function filter(node, options) {
+      return options.collapseMacro && node.nodeName === 'DIV' && node.classList.contains('collapsed-text');
+    },
+    replacement: function replacement(content, node, options) {
+      var collapseMacros = options.collapseMacros;
+      var redmineId = node.id.match(/collapse-([^-]+)/)[1];
+      return collapseMacros.renderPlaceholder(redmineId, macro.renderMacroBody(content));
+    }
+  });
 
   var rules_1 = function redmineRules(turndownService) {
     turndownService.keep(keptElements);
@@ -3760,6 +3333,84 @@
 
   var Contexts_1 = Contexts;
 
+  var defaultLength = 16;
+  var placeholders = {
+    randomString: function randomString(n) {
+      var length = n || defaultLength;
+      var result = '';
+
+      for (var i = 0; i < length; i++) {
+        result += Math.floor(Math.random() * 16).toString(16);
+      }
+
+      return result;
+    }
+  };
+
+  var CollapseMacros = function () {
+    function CollapseMacros(defaultArgs) {
+      this.defaultArgs = defaultArgs;
+      this.placeholder = placeholders.randomString();
+      this.index = 0;
+      this.args = {};
+      this.collapsedBlocks = [];
+      this.MACRO_RE = new RegExp(this.placeholder + "collapseMacro(\\d+)placeholder", 'g');
+    }
+
+    var _proto = CollapseMacros.prototype;
+
+    _proto.renderPlaceholder = function renderPlaceholder(redmineId, body) {
+      this.collapsedBlocks.push({
+        id: this.index,
+        redmineId: redmineId,
+        body: body
+      });
+      var replacement = this.placeholder + "collapseMacro" + this.index + "placeholder";
+      this.index++;
+      return replacement;
+    };
+
+    _proto.renderCollapseMacro = function renderCollapseMacro(id, body) {
+      var _this = this;
+
+      var args = [].concat(new Set(Object.keys(this.args[id]).map(function (key) {
+        return _this.args[id][key];
+      })));
+      var paramStr = '';
+
+      if (!arrays.equals(this.defaultArgs, args)) {
+        var renderedArgs = args.map(function (arg) {
+          return macro.renderMacroArgument(arg);
+        });
+        paramStr = "(" + renderedArgs.join(', ') + ")";
+      }
+
+      return "{{collapse" + paramStr + body + "}}";
+    };
+
+    _proto.replacePlaceholders = function replacePlaceholders(output) {
+      var _this2 = this;
+
+      if (!this.collapsedBlocks.length && !Object.keys(this.args).length) {
+        return output;
+      }
+
+      var replacedOutput = output.replace(this.MACRO_RE, function (match, id) {
+        var macroObj = _this2.collapsedBlocks.filter(function (obj) {
+          return obj.id === parseInt(id, 10);
+        })[0];
+
+        var lpad = strings.startsWith(output.substring(output.indexOf(match) - 1), '!') ? ' ' : '';
+        return "" + lpad + _this2.renderCollapseMacro(macroObj.redmineId, macroObj.body);
+      });
+      return replacedOutput;
+    };
+
+    return CollapseMacros;
+  }();
+
+  var CollapseMacros_1 = CollapseMacros;
+
   function shallowKeepReplacement(content, node) {
     if (node.isBlock) {
       return "\n\n" + node.outerHTML + "\n\n";
@@ -3770,6 +3421,15 @@
   }
 
   var shallowKeepReplacement_1 = shallowKeepReplacement;
+
+  function gfmEscapeTextReplacement(content, node, options) {
+    var escapers = options.escapers,
+        contexts = options.contexts;
+    var text = escapers.escaper('text').escape(node.nodeValue, contexts.forNode(node));
+    return text;
+  }
+
+  var gfmEscapeTextReplacement_1 = gfmEscapeTextReplacement;
 
   var TurndownPluginGfm = getCjsExportFromNamespace(turndownPluginGfm_es);
 
@@ -3787,7 +3447,8 @@
     codeBlockStyle: 'fenced',
     emDelimiter: '*',
     strikethroughDelimiter: '~~',
-    keepReplacement: shallowKeepReplacement_1
+    keepReplacement: shallowKeepReplacement_1,
+    textReplacement: gfmEscapeTextReplacement_1
   };
   var defaultOptions = {
     fontColor: false,
@@ -3798,7 +3459,9 @@
     citeDelimiter: '<cite>',
     preformattedCode: true,
     htmlEncodedRedmineMacros: true,
-    thumbnailMacro: true
+    thumbnailMacro: true,
+    collapseMacro: true,
+    defaultCollapseMacroArgs: ['Show', 'Hide']
   };
 
   function decorateRules() {
@@ -3834,10 +3497,12 @@
     var _proto = RedmineTurndownService.prototype;
 
     _proto.turndown = function turndown(input) {
+      var collapseMacros = new CollapseMacros_1(this.options.defaultCollapseMacroArgs);
       applyRuntimeOptions.call(this, {
-        contexts: new Contexts_1(this.rules)
+        contexts: new Contexts_1(this.rules),
+        collapseMacros: collapseMacros
       });
-      return _PatchedTurndownServi.prototype.turndown.call(this, input);
+      return collapseMacros.replacePlaceholders(_PatchedTurndownServi.prototype.turndown.call(this, input));
     };
 
     return RedmineTurndownService;
