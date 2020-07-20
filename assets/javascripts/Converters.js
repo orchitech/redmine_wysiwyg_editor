@@ -3,8 +3,8 @@
     module.exports = factory(require('rwe-to-textile'),
       require('turndown-redmine'),
       require('rwe-turndown-plugin-gfm'),
-      require('./commonRules'),
-      require('./converterUtils'),
+      require('./CommonRules'),
+      require('./ConverterUtils'),
       require('./redmine-formatting.cjs'));
   } else {
     var tt = (typeof toTextile !== 'undefined') ? toTextile : null;
@@ -150,10 +150,15 @@
       replacement: function(content, node) {
         // Remove percentage value because RedCloth3 can't parse correctly.
         var attr = utils.styleAttr(node).replace(/\s*\d+%/g, '');
+        var classes = utils.classAttr(node);
 
-        return ((attr.length > 0) && (content.length > 0) &&
-                (node.parentNode.nodeName !== 'SPAN')) ?
-                utils.gluableContent('%' + attr + content + '%', node, NT) : content;
+        if (((attr.length > 0) || (classes.length > 0)) &&
+                (content.length > 0) &&
+                (node.parentNode.nodeName !== 'SPAN')) {
+          return utils.gluableContent('%' + classes + attr + content + '%', node, NT);
+        } else {
+          return content;
+        }
       }
     }, {
       // Bold
@@ -334,8 +339,8 @@
     // Preprocessing of Redmine rich text before it's sent to standard Redmine
     // renderer (e.g. the preview page) for rendering to HTML will be handled
     // in this method.
-    return this.redmineFormatting.preprocessTextForWysiwygRendering((format === 'textile'
-      ? preprocessTextile(data) : preprocessMarkdown(data)))
+    return this.redmineFormatting.preprocessTextForWysiwygRendering(
+      (format === 'textile' ? preprocessTextile(data) : preprocessMarkdown(data)))
       .replace(/\{\{/g, '{$${')
       .replace(/document:/g, 'document$$:')
       .replace(/forum:/g, 'forum$$:')
@@ -362,7 +367,7 @@
   };
 
   Converters.prototype.preprocessHtmlForConversion = function(html) {
-    // Preprocessing of HTML obtained from HTML editor to a form suitable 
+    // Preprocessing of HTML obtained from HTML editor to a form suitable
     // for converter to rich text will be handled in this method.
     return this.redmineFormatting.preprocessWysiwygHtmlForConversion(html);
   }

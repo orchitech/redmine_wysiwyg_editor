@@ -1,6 +1,6 @@
 (function(root, factory) {
   if (typeof exports === 'object') {
-    module.exports = factory(require('./languages'));
+    module.exports = factory(require('./Languages'));
   } else {
     var languages = (typeof Languages !== 'undefined') ? Languages : null;
     root.EditorUtils = factory(languages);

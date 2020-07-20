@@ -1,6 +1,6 @@
 (function(root, factory) {
   if (typeof exports === 'object') {
-    module.exports = factory(require('./languages'));
+    module.exports = factory(require('./Languages'));
   } else {
     var languages = (typeof Languages !== 'undefined') ? Languages : null;
     root.ConverterUtils = factory(languages);
@@ -29,6 +29,7 @@
       return name
         .replace(/["%'*:<>?]/g, '_')
         .replace(/[ !&()+[\]]/g, function(c) {
+          // this will be fixed in upcoming version of turndown-redmine
           return '%' + c.charCodeAt(0).toString(16);
         });
     };
@@ -68,38 +69,14 @@
     return /[\s!&(),;[\]{}]/.test(str) ? '"' + str + '"' : str;
   };
 
-  ConverterUtils.prototype.colorRgbToHex = function(str) {
-    // RedCloth does not allow CSS function.
-    return str
-      .replace(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/g, function(s, r, g, b) {
-        return '#' + [r, g, b].map(function(x) {
-          return ('0' + parseInt(x).toString(16)).slice(-2);
-        }).join('');
-    });
-  };
+  ConverterUtils.prototype.classAttr = function(node) {
+    var classes = node.classList;
 
-  ConverterUtils.prototype.styles = function(node) {
-    var attr = {};
-
-    // Defined in redcloth3.rb
-    var STYLES_RE = /^(color|width|height|border|background|padding|margin|font|float)(-[a-z]+)*:\s*((\d+%?|\d+px|\d+(\.\d+)?em|#[0-9a-f]+|[a-z]+)\s*)+$/i;
-
-    // FIXME: Property cssText depends on the browser.
-    this.colorRgbToHex(node.style.cssText)
-      .split(/\s*;\s*/)
-      .filter(function(value) {
-        return STYLES_RE.test(value);
-      }).forEach(function(str) {
-        var val = str.split(/\s*:\s*/);
-
-        attr[val[0]] = val[1];
-      });
-
-    return attr;
-  };
+    return (classes.length > 0) ? '(' + classes.value.replace(/wiki-class-/g, '') + ')' : '';
+  }
 
   ConverterUtils.prototype.styleAttr = function(node) {
-    var attr = this.styles(node);
+    var attr = styles(node);
 
     // For image resizing
     ['width', 'height'].forEach(function(name) {
@@ -141,6 +118,36 @@
     if (style.length > 0) attr.push(style);
 
     return (attr.length > 0) ? attr.join('') + '.' : '';
+  };
+
+  function colorRgbToHex(str) {
+    // RedCloth does not allow CSS function.
+    return str
+      .replace(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/g, function(s, r, g, b) {
+        return '#' + [r, g, b].map(function(x) {
+          return ('0' + parseInt(x).toString(16)).slice(-2);
+        }).join('');
+    });
+  };
+
+  function styles(node) {
+    var attr = {};
+
+    // Defined in redcloth3.rb
+    var STYLES_RE = /^(color|width|height|border|background|padding|margin|font|float)(-[a-z]+)*:\s*((\d+%?|\d+px|\d+(\.\d+)?em|#[0-9a-f]+|[a-z]+)\s*)+$/i;
+
+    // FIXME: Property cssText depends on the browser.
+    colorRgbToHex(node.style.cssText)
+      .split(/\s*;\s*/)
+      .filter(function(value) {
+        return STYLES_RE.test(value);
+      }).forEach(function(str) {
+        var val = str.split(/\s*:\s*/);
+
+        attr[val[0]] = val[1];
+      });
+
+    return attr;
   };
 
   return ConverterUtils;

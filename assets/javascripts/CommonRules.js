@@ -1,8 +1,8 @@
 (function(root, factory) {
   if (typeof exports === 'object') {
-    module.exports = factory(this);
+    module.exports = factory();
   } else {
-    root.CommonRules = factory(this);
+    root.CommonRules = factory();
   }
 }(this, function() {
   function CommonRules(utils) {
@@ -31,7 +31,7 @@
         var proj = m[1];
         var page = m[2] ? decodeURIComponent(m[2]) : null;
         var anchor = m[3] ? decodeURIComponent(m[3]) : null;
-  
+
         var r = [];
 
         if ((proj !== key) || !page) r.push(proj + ':');
@@ -48,6 +48,7 @@
     var utils = this.utils;
     return [
       {
+        // FIXME this rule is duplicated in turndown-redmine
         key: 'issue',
         filter: function(node) {
           return (node.nodeName === 'A') && node.classList.contains('issue');
