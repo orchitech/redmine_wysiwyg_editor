@@ -1,8 +1,8 @@
 (function(root, factory) {
   if (typeof exports === 'object') {
-    module.exports = factory(this);
+    module.exports = factory();
   } else {
-    root.Languages = factory(this);
+    root.Languages = factory();
   }
 }(this, function() {
   function Languages() {

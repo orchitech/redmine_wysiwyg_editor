@@ -4,8 +4,8 @@
     var dom = new jsdom.JSDOM('<!doctype html>');
 
     module.exports = factory(require('jquery')(dom.window),
-                             require('./editorUtils'),
-                             require('./converters'),
+                             require('./EditorUtils'),
+                             require('./Converters'),
                              {});
   } else {
     var utils = (typeof EditorUtils !== 'undefined') ? EditorUtils : null;
