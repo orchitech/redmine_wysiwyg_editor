@@ -10,8 +10,8 @@
 }(this, function(Converters, assert) {
 
 suite('Converters', function() {
-  var x = new Converters();
   var format = 'markdown';
+  var x = new Converters({ format });
 
   test('preprocessTextForRendering', function() {
     var content = '``` c\nfoo\n```';
@@ -21,9 +21,8 @@ suite('Converters', function() {
 
   test('postprocessHtml', function() {
     var content = '<pre>c+-*/!?\nfoo</pre>';
-    var expected = '<pre data-code="c">\nfoo</pre>';
-
-    assert.equal(x.postprocessHtml(content, format), expected);
+    var expected = '<pre class="language-c">\nfoo</pre>';
+    assert.equal(x.postprocessHtml(content), expected);
   });
 
   test('preprocessHtmlForConversion', function() {

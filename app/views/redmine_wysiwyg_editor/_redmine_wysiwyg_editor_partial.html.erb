@@ -150,7 +150,7 @@ function initRedmineWysiwygEditor() {
     setVisible();
   };
 
-  var rwe = new RedmineWysiwygEditor($(this), previewUrl);
+  var rwe = new RedmineWysiwygEditor($(this), previewUrl, '<%= formatting %>');
 
   rwe.setPostInitCallback(function() { postInit(rwe) });
 

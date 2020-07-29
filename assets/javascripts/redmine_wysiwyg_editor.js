@@ -15,15 +15,14 @@
   }
 }(this, function($, EditorUtils, Converters, navigator) {
   var utils = EditorUtils ? new EditorUtils() : null;
-  var converters = Converters ? new Converters() : null;
 
-var RedmineWysiwygEditor = function(jstEditor, previewUrl) {
+var RedmineWysiwygEditor = function(jstEditor, previewUrl, format) {
   this._jstEditor = jstEditor;
   this._previewUrl = previewUrl;
   this._postInit = function() {};
 
   this._prefix = '/';
-  this._format = 'textile';
+  this._format = format ? format : 'textile';
   this._language = 'en';
   this._i18n = {
     textile: 'Textile',
@@ -36,7 +35,7 @@ var RedmineWysiwygEditor = function(jstEditor, previewUrl) {
     mainPage: 'Main page',
     insertWikiLink: 'Insert Wiki link'
   };
-
+  this.converters = new Converters({ format: this._format });
   this._project = {};
 
   this._attachment = {};
@@ -308,6 +307,14 @@ RedmineWysiwygEditor.prototype._initTinymce = function(setting) {
       e.preventDefault();
     }).on('drop', function(e) {
       self._dropEventHandler(e);
+    }).on('PreProcess', function(e) {
+      // TinyMCE uses <br /> as newline in preformatted text, but HTML is not
+      // converted inside preformatted text by turndown-redmine
+      $('pre', e.node).each(function(idx, elm) {
+        $(elm).find('br').each(function(idx, elm) {
+          elm.parentNode.replaceChild(editor.getDoc().createTextNode('\n'), elm);
+        });
+      });
     });
 
     self._changeMode(self._defaultMode.get());
@@ -641,7 +648,7 @@ RedmineWysiwygEditor.prototype._setVisualContent = function() {
     var name = self._oldPreviewAccess ? textarea[0].name : 'text';
 
     var data = {};
-    data[name] = converters.preprocessTextForRendering(textarea[0].value.replace(/\$/g, '$$$$'), self._format);
+    data[name] = self.converters.preprocessTextForRendering(textarea[0].value.replace(/\$/g, '$$$$'));
 
     params.push($.param(data));
 
@@ -653,7 +660,7 @@ RedmineWysiwygEditor.prototype._setVisualContent = function() {
     url: self._previewUrl,
     data: previewData(self._jstEditorTextArea),
     success: function(data) {
-      self._editor.setContent(converters.postprocessHtml(data, self._format));
+      self._editor.setContent(self.converters.postprocessHtml(data));
     }
   });
 };
@@ -681,25 +688,26 @@ RedmineWysiwygEditor.prototype._setTextContent = function() {
   var self = this;
   var html = self._editor.getContent();
 
-  var preparedHtml = converters.preprocessHtmlForConversion(html);
+  var preparedHtml = self.converters.preprocessHtmlForConversion(html);
 
   var text = (self._format === 'textile') ?
     self._toTextTextile(preparedHtml) :
     self._toTextMarkdown(preparedHtml);
-  var processedText = converters.postprocessConvertedText(text);
+  var processedText = self.converters.postprocessConvertedText(text);
 
   self._jstEditorTextArea.val(processedText);
 };
 
 RedmineWysiwygEditor.prototype._toTextTextile = function(content) {
-  return converters.toTextTextile(content, $, this._attachment, this._project.key);
+  var self = this;
+  return self.converters.toTextTextile(content, $, this._attachment, this._project.key);
 };
 
 RedmineWysiwygEditor.prototype._toTextMarkdown = function(content) {
   var self = this;
 
   if (!self._markdown) {
-    self._markdown = converters.initMarkdown(this._project.key, this._htmlTagAllowed);
+    self._markdown = self.converters.initMarkdown(this._project.key, this._htmlTagAllowed);
   }
   return self._markdown.turndown(content);
 };

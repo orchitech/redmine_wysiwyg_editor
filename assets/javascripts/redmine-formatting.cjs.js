@@ -1,77 +1,46 @@
 'use strict';
 
-/**
- * Class encapsulating Redmine-specific rich text conversions.
- *
- * This is a stateless version, i.e. there are no metadata mainained between
- * the calls. This means that all eventual metadata needs to be encoded to
- * the produced results while no information is extracted and remmebered.
- * If it turns out a stateful version is needed, refactoring will take place.
- * Some extra methods and constants might also be added, e.g. URL regexps.
- */
-class RedmineFormatting {
-  /**
-   * The constructor will likely need to know the formatting (markdown /
-   * textile / common_mark, ...).
-   * @param {object} options
-   */
-  // eslint-disable-next-line no-useless-constructor
-  constructor(options = {}) {
+var RedmineFormatting = function () {
+  function RedmineFormatting(options) {
+    if (options === void 0) {
+      options = {};
+    }
+
     this.options = options;
   }
 
-  /**
-   * Prepare Redmine rich text before it is sent to standard Redmine renderer
-   * (e.g. the preview page) for rendering to HTML.
-   *
-   * The preprocessing should make sure that special Redmine constructs like
-   * macros, wiki links and resource links pass through the Redmine renderer in
-   * a form that is suitable for HTML editing.
-   * @param {string} redmineText rich text to preprocess
-   */
-  // eslint-disable-next-line class-methods-use-this
-  preprocessTextForWysiwygRendering(redmineText) {
-    // macro encode
-    // something with Redmine links?
-    // something with wiki links?
-    return redmineText;
-  }
+  var _proto = RedmineFormatting.prototype;
 
-  /**
-   * Counterpart of {@link #preprocessTextForWysiwygRendering}, should be
-   * called on the Redmine-rendered text before it is actually handed over
-   * to the editor.
-   * @param {string} redmineHtml
-   */
-  // eslint-disable-next-line class-methods-use-this
-  postprocessHtmlForWysiwyg(redmineHtml) {
-    return redmineHtml;
-  }
+  _proto.preprocessTextForWysiwygRendering = function preprocessTextForWysiwygRendering(redmineText) {
+    var data = redmineText;
 
-  /**
-   * Prepare HTML obtained from HTML editor to a form suitable for converter
-   * to richtext, e.g. Turndown.
-   * @param {string} wysiwygHtml
-   * @return {string|Node} - not yet sure
-   */
-  // eslint-disable-next-line class-methods-use-this
-  preprocessWysiwygHtmlForConversion(wysiwygHtml) {
+    if (['markdown', 'common_mark'].indexOf(this.options.format) >= 0) {
+      data = data.replace(/^~~~ *(\w+)([\S\s]+?)~~~$/mg, '```\n$1+-*/!?$2```').replace(/^``` *(\w+)([\S\s]+?)```$/mg, '```\n$1+-*/!?$2```');
+    }
+
+    return data;
+  };
+
+  _proto.postprocessHtmlForWysiwyg = function postprocessHtmlForWysiwyg(redmineHtml) {
+    var data = redmineHtml;
+
+    if (['markdown', 'common_mark'].indexOf(this.options.format) >= 0) {
+      data = data.replace(/<pre>(?:<code>)*?(\w+)\+-\*\/!\?([\S\s]+?)(?:<\/code>)*?<\/pre>/g, '<pre class="language-$1">$2</pre>');
+    }
+
+    return data;
+  };
+
+  _proto.preprocessWysiwygHtmlForConversion = function preprocessWysiwygHtmlForConversion(wysiwygHtml) {
     return wysiwygHtml;
-  }
+  };
 
-  /**
-   * Counterpart of {@link #preprocessTextForWysiwygRendering} to be called
-   * on the rich text obtained from HTML -> text conversion.
-   *
-   * Not sure if it is going to be needed.
-   * @param {string} convertedText
-   * @return {string}
-   */
-  // eslint-disable-next-line class-methods-use-this
-  postprocessConvertedText(convertedText) {
+  _proto.postprocessConvertedText = function postprocessConvertedText(convertedText) {
     return convertedText;
-  }
-}
+  };
+
+  return RedmineFormatting;
+}();
 
 var RedmineFormatting_1 = RedmineFormatting;
 
