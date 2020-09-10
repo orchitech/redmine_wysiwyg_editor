@@ -315,6 +315,22 @@ RedmineWysiwygEditor.prototype._initTinymce = function(setting) {
           elm.parentNode.replaceChild(editor.getDoc().createTextNode('\n'), elm);
         });
       });
+    }).on('beforeSetContent', function (e) {
+      // TinyMCE's editor.getContent() returns empty string when page is loaded
+      // for the first time even though there is a content. Editor's 
+      // $('body')[0].innerHTML returns '<p><br data-mce-bogus="1"></p>' even
+      // though $('body')[0] shows real content of the editor, but there is no
+      // other way to get it.
+      var editorDom = document.createElement('div');
+      editorDom.innerHTML = e.content
+      var editorContent = editorDom.innerHTML;
+
+      // process HTML code block
+      var processedDom = self.converters.processHtmlCodeBlock(editorDom, document);
+      var processedContent = processedDom.innerHTML;
+      if (editorContent !== processedContent) {
+        e.content = processedContent;
+      }
     });
 
     self._changeMode(self._defaultMode.get());

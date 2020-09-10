@@ -374,6 +374,10 @@
     return this.redmineFormatting.postprocessConvertedText(text);
   }
 
+  Converters.prototype.processHtmlCodeBlock = function(html, document) {
+    return this.redmineFormatting.processHtmlCodeBlock(html, document);
+  }
+
   function preprocessTextile(data) {
     return data
       .replace(/&#([1-9][0-9]*);/g, '&$$#$1;')
