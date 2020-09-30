@@ -7,39 +7,33 @@
   tinymce.PluginManager.add('redmineformat', function (editor) {
     var $ = editor.$;
 
-    var innerText = function(node) {
-      $(node).find('br').each(function (index, node) {
-        node.parentNode.replaceChild(editor.getDoc().createTextNode('\n'), node);
-      });
-    };
-
     editor.on('PreProcess', function (e) {
       $('pre', e.node).each(function (index, node) {
-        innerText(node);
+        replaceContentWithInnerText(node);
       });
     });
 
     editor.on('SetContent', function () {
       $('pre').filter(function (index, node) {
-        return isCodeBlock(node);
+        return !!codeLanguageFromClassName(codeBlockCodeNode(node).className);
       }).each(function (index, node) {
-        var firstChild = node.firstChild;
-        var codeNode = firstChild.nodeName == 'CODE' && firstChild.className ? firstChild : node;
-        innerText(node);
+        var codeNode = codeBlockCodeNode(node);
+        replaceContentWithInnerText(node);
         node.innerHTML = editor.dom.encode(node.textContent);
         node.className = "language-" + codeLanguageFromClassName(codeNode.className);
       });
     });
   });
 
-  function isCodeBlock(node) {
-    var firstChild = node.firstChild;
-    var hasSingleChild = firstChild && node.childNodes.length === 1;
-    if (!hasSingleChild) {
-      return false;
-    }
-    var codeNode = firstChild.nodeName == 'CODE' && firstChild.className ? firstChild : node;
-    return !!codeLanguageFromClassName(codeNode.className);
+  function replaceContentWithInnerText(node) {
+    $(node).find('br').each(function (index, node) {
+      node.parentNode.replaceChild(document.createTextNode('\n'), node);
+    });
+  }
+
+  function codeBlockCodeNode(preNode) {
+    var singleChild = preNode.childNodes.length === 1 && preNode.firstChild;
+    return singleChild && singleChild.nodeName === 'CODE' && singleChild.className ? singleChild : preNode;
   }
 
   function codeLanguageFromClassName(className) {
