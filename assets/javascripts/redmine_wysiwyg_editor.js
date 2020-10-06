@@ -427,6 +427,7 @@ RedmineWysiwygEditor.prototype._initTinymce = function(setting) {
     image_dimensions: isObjectResizable,
     mentions: autocompleteSetting
   }));
+  console.log(tinymce)
 };
 
 RedmineWysiwygEditor._isImageFile = function(name) {
