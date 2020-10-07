@@ -1,48 +1,65 @@
-(function(root, factory) {
-  if (typeof exports === 'object') {
-    var assert = require('chai').assert;
-    var { JSDOM } = require('jsdom');
-
-    factory(tiny, assert, JSDOM); // FIXME
-  } else {
-    factory(tinyMCE, chai.assert, null);
-  }
-}(this, function (tinyMCE, assert, JSDOM) {
-  var doc;
-
-  function node(input) {
-    var dom;
-    if (typeof exports === 'object') {
-      doc = new JSDOM(input).window.document;
-      dom = doc;
-    } else {
-      doc = document;
-      dom = doc.createElement('div');
-      dom.innerHTML = input;
-    }
-    return dom.querySelector('#me') || dom.querySelector('#myChild').firstChild;
-  }
-
-  var _editor;
-
-  function setup(editor) {
-    _editor = editor;
-  }
-
-  tinyMCE.init({
-    selector: '#test',
-    plugins: 'redmineformat',
-    setup: setup
+suite('RedmineFormatPlugin', function () {
+  setup(function () {
+    var wysiwygNode = document.createElement('div');
+    wysiwygNode.id = 'wysiwyg';
+    document.body.appendChild(wysiwygNode);
   });
+  teardown(function() {
+    var editor = tinymce.get('wysiwyg');
+    if (editor) {
+      editor.off(null);
+      tinymce.remove('#wysiwyg');
+    }
+    var wysiwygNode = document.getElementById('wysiwyg');
+    if (wysiwygNode) {
+      document.body.removeChild(wysiwygNode);
+    }
+  });
+  function withEditor(allowedEvents, testCallback) {
+    tinymce.init({
+      selector: '#wysiwyg',
+      theme: false,
+      plugins: 'redmineformat',
+      setup: function (editor) {
+        editor.on('init', function(e) {
+          var events = [].concat(allowedEvents).map(function (event) {
+            return event.toLowerCase();
+          });
+          ['SetContent', 'PreProcess'].forEach(function (event) {
+            if (events.indexOf(event.toLowerCase()) < 0) {
+              editor.off(event);
+            }
+          });
+          testCallback(editor);
+        });
+      }
+    });
+  }
 
-  suite('RedmineFormatPlugin', function() {
-    test('', function() {
-      var content = node('<pre id="me">a<br>b</pre>');
-
-      _editor.setContent('<pre id="me">a<br>b</pre>');
-      // _editor.off('SetContent')
-      // _editor.fire('PreProcess', { node: content, format: 'html' })
-      var output = _editor.getContent()
+  suite('SetContent handler', function () {
+    test('should normalize code block', function (done) {
+      withEditor('SetContent', function (editor) {
+        var c = '<p><pre><code class="java syntaxhl">foo<br>bar</code></pre></p>';
+        editor.setContent(c);
+        chai.assert.equal(editor.getContent(), '<pre class="language-java">foo\nbar</pre>');
+        done();
+      });
     });
   });
-}));
+
+  suite('PreProcess handler', function () {
+    test('should convert br to nl and normalize text', function (done) {
+      withEditor('PreProcess', function (editor) {
+        var c = '<p><pre>foo<br>bar</pre></p>';
+        editor.on('PreProcess', function (e) {
+          var pre = editor.$('pre', e.node)[0];
+          chai.assert.equal(pre.childNodes.length, 1, 'child node count');
+          chai.assert.equal(pre.firstChild.nodeType, window.Node.TEXT_NODE, 'node type');
+        });
+        editor.setContent(c);
+        chai.assert.equal(editor.getContent(), '<pre>foo\nbar</pre>');
+        done();
+      });
+    });
+  });
+});
