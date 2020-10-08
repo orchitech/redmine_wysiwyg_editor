@@ -1,3 +1,6 @@
+/*
+ * Setup global variables for Node.js to match browser setup.
+ */
 if (typeof exports === 'object') {
   exports.mochaHooks = {
     beforeAll() {
@@ -12,6 +15,12 @@ if (typeof exports === 'object') {
       global.tinymce = window.tinymce = tinymce;
 
       require('../../assets/javascripts/RedmineFormatPlugin');
+    },
+    afterAll() {
+      delete global.chai;
+      delete global.window;
+      delete global.document;
+      delete global.tinymce;
     },
   };
 }
