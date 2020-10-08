@@ -1,4 +1,7 @@
 {
   "ui": "tdd",
-  "require": "test/headless/register"
+  "require": [
+    "test/hooks/headless",
+    "test/hooks/globals"
+  ]
 }

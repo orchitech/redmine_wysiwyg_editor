@@ -41,7 +41,7 @@ suite('RedmineFormatPlugin', function () {
       withEditor('SetContent', function (editor) {
         var c = '<p><pre><code class="java syntaxhl">foo<br>bar</code></pre></p>';
         editor.setContent(c);
-        chai.assert.equal(editor.getContent(), '<pre class="language-java">foo\nbar</pre>');
+        assert.equal(editor.getContent(), '<pre class="language-java">foo\nbar</pre>');
         done();
       });
     });
@@ -53,11 +53,11 @@ suite('RedmineFormatPlugin', function () {
         var c = '<p><pre>foo<br>bar</pre></p>';
         editor.on('PreProcess', function (e) {
           var pre = editor.$('pre', e.node)[0];
-          chai.assert.equal(pre.childNodes.length, 1, 'child node count');
-          chai.assert.equal(pre.firstChild.nodeType, window.Node.TEXT_NODE, 'node type');
+          assert.equal(pre.childNodes.length, 1, 'child node count');
+          assert.equal(pre.firstChild.nodeType, window.Node.TEXT_NODE, 'node type');
         });
         editor.setContent(c);
-        chai.assert.equal(editor.getContent(), '<pre>foo\nbar</pre>');
+        assert.equal(editor.getContent(), '<pre>foo\nbar</pre>');
         done();
       });
     });
