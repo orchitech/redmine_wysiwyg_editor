@@ -403,7 +403,7 @@ RedmineWysiwygEditor.prototype._initTinymce = function(setting) {
     content_style: style,
     height: Math.max(self._jstEditorTextArea.height(), 200),
     branding: false,
-    plugins: 'link image lists hr table textcolor codesample paste mention fullscreen',
+    plugins: 'redmineformat link image lists hr table textcolor codesample paste mention fullscreen',
     menubar: false,
     toolbar: toolbar,
     toolbar_items_size: 'small',
@@ -657,8 +657,6 @@ RedmineWysiwygEditor.prototype._setVisualContent = function() {
 
     var escapeMarkdown = function(data) {
       return data
-        .replace(/^~~~ *(\w+)([\S\s]+?)~~~$/mg, '~~~\n$1+-*/!?$2~~~')
-        .replace(/^``` *(\w+)([\S\s]+?)```$/mg, '~~~\n$1+-*/!?$2~~~');
     };
 
     var escapeText = (self._format === 'textile') ?
@@ -682,20 +680,8 @@ RedmineWysiwygEditor.prototype._setVisualContent = function() {
   };
 
   var htmlContent = function(data) {
-    var unescapeHtmlTextile = function(data) {
-      return data;
-    };
-
-    var unescapeHtmlMarkdown = function(data) {
-      return data.replace(/<pre>(\w+)\+-\*\/!\?([\S\s]+?)<\/pre>/g,
-                          '<pre data-code="$1">$2</pre>');
-    };
-
-    var unescapeHtml = (self._format === 'textile') ?
-        unescapeHtmlTextile : unescapeHtmlMarkdown;
-
     // FIXME: Lost if exists in PRE.
-    return unescapeHtml(data)
+    return data
       .replace(/\$(.)/g, '$1')
       .replace(/<legend>.+<\/legend>/g, '')
       .replace(/<a name=.+?><\/a>/g, '')
