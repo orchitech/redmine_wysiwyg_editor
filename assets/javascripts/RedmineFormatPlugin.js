@@ -1,7 +1,7 @@
 (function() {
   var CODE_CLASS_PATTERNS = [
     /^(?:language|code)-(\S+)$/, // CommonMark
-    /^(\S+)\s+syntaxhl$/ // Redmine
+    /^(\S+)\s+syntaxhl$/, // Redmine
   ];
 
   tinymce.PluginManager.add('redmineformat', function (editor) {
@@ -23,9 +23,9 @@
       return CODE_CLASS_PATTERNS.reduce(function (match, regexp) {
         return match || (codeNode.className.match(regexp) || [null, null])[1];
       }, null);
-    }  
+    }
 
-    editor.on('SetContent', function (ev) {
+    editor.on('SetContent', function () {
       $('pre').filter(function (index, node) {
         return !!codeBlockLanguage(node);
       }).each(function (index, node) {

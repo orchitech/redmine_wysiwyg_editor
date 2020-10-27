@@ -1,8 +1,13 @@
 suite('RedmineFormatPlugin', function () {
   setup(function () {
+    var tempNode = document.createElement('div');
+    tempNode.id = "tempNode";
+    tempNode.style = 'visibility: hidden';
+    document.body.appendChild(tempNode);
+
     var wysiwygNode = document.createElement('div');
     wysiwygNode.id = 'wysiwyg';
-    document.body.appendChild(wysiwygNode);
+    document.getElementById('tempNode').appendChild(wysiwygNode);
   });
   teardown(function() {
     var editor = tinymce.get('wysiwyg');
@@ -10,9 +15,9 @@ suite('RedmineFormatPlugin', function () {
       editor.off(null);
       tinymce.remove('#wysiwyg');
     }
-    var wysiwygNode = document.getElementById('wysiwyg');
-    if (wysiwygNode) {
-      document.body.removeChild(wysiwygNode);
+    var tempNode = document.getElementById('tempNode');
+    if (tempNode) {
+      tempNode.parentElement.removeChild(tempNode);
     }
   });
   function withEditor(allowedEvents, testCallback) {

@@ -13,6 +13,7 @@ if (typeof exports === 'object') {
       global.document = window.document;
       var tinymce = require('../../assets/javascripts/tinymce/tinymce.min');
       global.tinymce = window.tinymce = tinymce;
+      global.RedmineWysiwygEditor = require('../../assets/javascripts/redmine_wysiwyg_editor');
 
       require('../../assets/javascripts/RedmineFormatPlugin');
     },
