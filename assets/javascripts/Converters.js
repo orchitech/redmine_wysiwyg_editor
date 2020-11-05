@@ -17,11 +17,12 @@
     root.Converters = factory(tt, td, gfm, commonRules, utils, redmineFormatting);
   }
 }(this, function(toTextile, TurndownRedmine, turndownPluginGfm, CommonRules, ConverterUtils, RedmineFormatting) {
-  function Converters() {
+  function Converters(options) {
+    this.options = options;
     this.turndownRedmine = TurndownRedmine ? new TurndownRedmine() : null;
     this.utils = new ConverterUtils();
     this.commonRules = new CommonRules(this.utils);
-    this.redmineFormatting = new RedmineFormatting();
+    this.redmineFormatting = new RedmineFormatting({ format: options.format });
   }
 
   Converters.prototype.initMarkdown = function(projectKey, htmlTagAllowed) {
@@ -335,12 +336,13 @@
     });
   };
 
-  Converters.prototype.preprocessTextForRendering = function(data, format) {
+  Converters.prototype.preprocessTextForRendering = function(data) {
+    var self = this;
     // Preprocessing of Redmine rich text before it's sent to standard Redmine
     // renderer (e.g. the preview page) for rendering to HTML will be handled
     // in this method.
     return this.redmineFormatting.preprocessTextForWysiwygRendering(
-      (format === 'textile' ? preprocessTextile(data) : preprocessMarkdown(data)))
+      (self.options.format === 'textile' ? preprocessTextile(data) : data))
       .replace(/\{\{/g, '{$${')
       .replace(/document:/g, 'document$$:')
       .replace(/forum:/g, 'forum$$:')
@@ -350,16 +352,10 @@
   };
 
   // FIXME: Lost if exists in PRE.
-  // FIXME: code block postprocessing
-  Converters.prototype.postprocessHtml = function(data, format) {
-    var content = data;
-    if (format === 'markdown') {
-      content = content.replace(/<pre>(\w+)\+-\*\/!\?([\S\s]+?)<\/pre>/g,
-        '<pre data-code="$1">$2</pre>');
-    }
+  Converters.prototype.postprocessHtml = function(data) {
     // Postprocessing of Redmine-rendered text before it's handled over
     // to the editor will be handled in this method.
-    return this.redmineFormatting.postprocessHtmlForWysiwyg(content)
+    return this.redmineFormatting.postprocessHtmlForWysiwyg(data)
       .replace(/\$(.)/g, '$1')
       .replace(/<legend>.+<\/legend>/g, '')
       .replace(/<a name=.+?><\/a>/g, '')
@@ -378,6 +374,10 @@
     return this.redmineFormatting.postprocessConvertedText(text);
   }
 
+  Converters.prototype.processHtmlCodeBlock = function(html, document) {
+    return this.redmineFormatting.processHtmlCodeBlock(html, document);
+  }
+
   function preprocessTextile(data) {
     return data
       .replace(/&#([1-9][0-9]*);/g, '&$$#$1;')
@@ -387,13 +387,6 @@
       .replace(/<\/notextile>/g, '</notextile></$$notextile>')
       .replace(/\[(\d+)\]/g, '[$$$1]')
       .replace(/^fn(\d+)\.\s/mg, 'fn$$$1. ');
-  }
-
-  // FIXME: code block preprocessing
-  function preprocessMarkdown(data) {
-    return data
-      .replace(/^~~~ *(\w+)([\S\s]+?)~~~$/mg, '~~~\n$1+-*/!?$2~~~')
-      .replace(/^``` *(\w+)([\S\s]+?)```$/mg, '```\n$1+-*/!?$2```');
   }
 
   return Converters;

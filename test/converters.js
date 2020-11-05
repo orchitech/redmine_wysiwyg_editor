@@ -2,29 +2,17 @@
   if (typeof exports === 'object') {
     var converters = require('../assets/javascripts/Converters.js');
     var assert = require('chai').assert;
+    var { JSDOM } = require('jsdom');
 
-    factory(converters, assert);
+    factory(converters, assert, JSDOM);
   } else {
-    factory(Converters, chai.assert);
+    factory(Converters, chai.assert, null);
   }
-}(this, function(Converters, assert) {
+}(this, function(Converters, assert, JSDOM) {
 
 suite('Converters', function() {
-  var x = new Converters();
   var format = 'markdown';
-
-  test('preprocessTextForRendering', function() {
-    var content = '``` c\nfoo\n```';
-    var expected = '```\nc+-*/!?\nfoo\n```\n\n&nbsp;'
-    assert.equal(x.preprocessTextForRendering(content, format), expected);
-  });
-
-  test('postprocessHtml', function() {
-    var content = '<pre>c+-*/!?\nfoo</pre>';
-    var expected = '<pre data-code="c">\nfoo</pre>';
-
-    assert.equal(x.postprocessHtml(content, format), expected);
-  });
+  var x = new Converters({ format });
 
   test('preprocessHtmlForConversion', function() {
     var content = '<h1>heading</h1>';

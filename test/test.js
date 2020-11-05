@@ -11,7 +11,7 @@
 
 suite('Redmine WYSIWYG Editor', function() {
   suite('Textile', function() {
-    var x = new RedmineWysiwygEditor(null, null);
+    var x = new RedmineWysiwygEditor(null, null, null);
 
     x.setProject(1, 'gnr');
     x.setAttachments([{name: 'foo.png', id: 1},
@@ -274,7 +274,7 @@ suite('Redmine WYSIWYG Editor', function() {
   });
 
   suite('Markdown', function() {
-    var x = new RedmineWysiwygEditor(null, null);
+    var x = new RedmineWysiwygEditor(null, null, 'markdown');
 
     x.setProject(1, 'gnr');
     x.setAttachments([{name: 'foo.png', id: 1},
